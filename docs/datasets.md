@@ -49,6 +49,14 @@ The image tokenizer is trained on the union of the three training splits (23,674
 - `prepare` samples every video at **2 fps**, centre-crops it to 540 × 540 and resizes it to **64 × 64** into `data/processed/cataract101_2fps_64/<video>.npz`. Experiments subsample this cache to 1 fps or 0.5 fps.
 - Split: video-level (= patient-level), seed 0, 70 / 15 / 15 %.
 
+| Split | videos | frames @ 2 fps | unannotated |
+|---|---|---|---|
+| train | 71 | 72,280 | 1,692 |
+| val | 15 | 15,462 | 261 |
+| test | 15 | 13,351 | 431 |
+
+The phases are imbalanced. Phacoemulsification (phase 5) covers 31 % of annotated training frames, and capsule polishing (phase 7) 4 %. This is why phase recognition is selected and reported on macro-F1.
+
 **Why Cataract-101 instead of Cholec80:** Cholec80's public archive now returns HTTP 403, so it needs a CAMMA data request. Cataract-101 is the closest openly available surgical-video dataset with expert phase annotations. `data/video.py` includes Cholec80 parsers (`cholec80_phases`, `cholec80_tools`), and the same frame sampler and codecs apply unchanged once a local copy exists.
 
 ### Text — templated notes (interface modality)
