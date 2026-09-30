@@ -1,55 +1,17 @@
+"""Vocabulary, schema, serialisation / deserialisation, MedicalToken view, shards."""
 import numpy as np
 import pytest
-import torch
 
-from medtok.codecs.image import ImageContCodec, ImageVQCodec
-from medtok.codecs.pointcloud import PointCloudVoxelCodec, chamfer, synthetic_organ_surface
-from medtok.codecs.text import TextBPECodec
-from medtok.codecs.timeseries import TSContCodec, TSEventCodec, TSVQCodec, ValueBinner, stay_segment
-from medtok.codecs.video import SurgicalEventCodec, VideoFrameVQCodec, synthetic_cholec80
-from medtok.data.physionet import STATIC_VARS, TS_IDX, TS_VARS, Normalizer, Stay, to_grid
-from medtok.eval.downstream import UnifiedTransformer, collate, drop_modality
-from medtok.protocol.schema import Sample, Segment, TokenSequence
-from medtok.protocol.serialize import deserialize, serialize, validate
-from medtok.protocol.vocab import RANGES, SPECIAL, VOCAB_SIZE, bucket_to_dt, dt_to_bucket
-from medtok.quant.models import ImageVQVAE, TSPatchVQ
-from medtok.toolkit import build_lexicon
+from medical_tokenizer.protocol.schema import Sample, Segment, TokenSequence, TokenSpan
+from medical_tokenizer.protocol.serialize import (deserialize, drop_modality, serialize, serialize_spans,
+                                                  split_spans, validate)
+from medical_tokenizer.protocol.storage import load_shard, save_shard
+from medical_tokenizer.protocol.tokens import TokenType, from_tokens, read_jsonl, to_tokens, token_type, write_jsonl
+from medical_tokenizer.protocol.vocab import (BOS, CONT, EOS, MODALITIES, RANGES, SPAN_END, SPAN_START, SPECIAL,
+                                              VOCAB_SIZE, Lexicon, bucket_to_dt, dt_to_bucket, range_of)
 
 
-# ------------------------------------------------------------------ fixtures
-def _stay(seed=0, rid="100"):
-    rng = np.random.default_rng(seed)
-    obs = []
-    for h in range(48):
-        for v in ("HR", "MAP", "Temp"):
-            obs.append((h * 60 + rng.integers(0, 60), TS_IDX[v], {"HR": 80, "MAP": 75, "Temp": 37}[v] + rng.normal(0, 3)))
-        if h % 12 == 0:
-            obs.append((h * 60 + 5, TS_IDX["Creatinine"], rng.uniform(0.5, 3)))
-    static = {"Age": 60.0, "Gender": 1.0, "Height": np.nan, "ICUType": 3.0}
-    return Stay(rid, static, np.array(sorted(obs), np.float32), int(seed % 2), "train")
-
-
-@pytest.fixture(scope="module")
-def stays():
-    return [_stay(i, str(100 + i)) for i in range(20)]
-
-
-@pytest.fixture(scope="module")
-def lex():
-    return build_lexicon()
-
-
-@pytest.fixture(scope="module")
-def binner(stays):
-    return ValueBinner(16).fit(stays)
-
-
-@pytest.fixture(scope="module")
-def text_codec():
-    return TextBPECodec.train(["Patient is a 60 y/o male admitted to the Medical ICU. GCS 15."] * 20, 300)
-
-
-# ------------------------------------------------------------------- vocab
+# ------------------------------------------------------------------ vocabulary
 def test_ranges_disjoint_and_cover_vocab():
     rs = sorted(RANGES.values(), key=lambda r: r.start)
     assert rs[0].start == 0 and rs[-1].end == VOCAB_SIZE
@@ -57,134 +19,176 @@ def test_ranges_disjoint_and_cover_vocab():
         assert a.end == b.start
 
 
-def test_dt_buckets_exact_for_minutes_and_hours():
-    for m in list(range(1, 61)) + [h * 60 for h in range(2, 49)]:
-        assert bucket_to_dt(dt_to_bucket(m)) == m
-    assert dt_to_bucket(0) == 0
-    assert dt_to_bucket(30 * 24 * 60) == 255
-    b = [dt_to_bucket(x) for x in np.geomspace(1, 30 * 24 * 60, 500)]
-    assert all(x <= y for x, y in zip(b, b[1:]))                     # monotone
-    for x in np.geomspace(49 * 60, 29 * 24 * 60, 50):                  # log range: upper edge within 4%
-        assert x <= bucket_to_dt(dt_to_bucket(x)) <= x * 1.04
+def test_required_special_tokens_exist():
+    for name in ["<IMAGE_START>", "<IMAGE_END>", "<VIDEO_START>", "<VIDEO_END>", "<TIME_SERIES_START>",
+                 "<TIME_SERIES_END>", "<TEXT_START>", "<TEXT_END>", "<POINT_CLOUD_START>", "<POINT_CLOUD_END>"]:
+        assert name in SPECIAL
+    assert set(SPAN_START) == set(MODALITIES) == set(SPAN_END)
+
+
+def test_dt_buckets_exact_for_seconds_minutes_hours():
+    for s in range(0, 60):
+        assert bucket_to_dt(dt_to_bucket(s / 60)) == pytest.approx(s / 60)
+    for m in range(1, 60):
+        assert bucket_to_dt(dt_to_bucket(m)) == pytest.approx(m)
+    for h in range(1, 49):
+        assert bucket_to_dt(dt_to_bucket(h * 60)) == pytest.approx(h * 60)
+    buckets = [dt_to_bucket(x) for x in np.geomspace(0.01, 40 * 24 * 60, 500)]
+    assert buckets == sorted(buckets) and max(buckets) == 255
+
+
+def test_range_conversion_errors():
+    with pytest.raises(ValueError):
+        RANGES["image_vq"].to_global(RANGES["image_vq"].size)
+    with pytest.raises(ValueError):
+        RANGES["image_vq"].to_local(0)
+    with pytest.raises(ValueError):
+        range_of(VOCAB_SIZE)
 
 
 def test_lexicon_roundtrip(tmp_path, lex):
-    p = tmp_path / "lex.json"
-    lex.save(p)
-    lex2 = type(lex).load(p)
-    assert lex2.variables == lex.variables and lex2.events == lex.events
-    assert len(lex.variables) == len(STATIC_VARS) + len(TS_VARS) <= RANGES["var"].size
-    assert lex.id_to_str(lex.var_id("HR")) == "<var:HR>"
+    lex.save(tmp_path / "lex.json")
+    lex2 = Lexicon.load(tmp_path / "lex.json")
+    assert lex2 == lex
+    assert lex.id_to_str(lex.var_id("HR")) == "<VAR:HR>"
+    assert lex.id_to_str(lex.segment_id(3)) == "<SEG:3>"
+    assert lex.id_to_str(SPECIAL["<IMAGE_START>"]) == "<IMAGE_START>"
 
 
-# ------------------------------------------------------------------ codecs
-def test_text_exact_roundtrip(text_codec):
-    for s in ["Patient is a 60 y/o male.", "Unicode ok: 37.5 °C, µg/L – ± ✓", "   spaces\n\tand tabs  "]:
-        span = text_codec.encode(Segment("text", s))
-        assert all(int(i) in RANGES["text"] for i in span.ids)
-        assert text_codec.decode(span) == s
+def test_lexicon_rejects_oversized():
+    with pytest.raises(ValueError):
+        Lexicon(variables=[f"v{i}" for i in range(300)])
 
 
-def test_ts_event_roundtrip_matches_binned_grid(stays, lex, binner):
-    c = TSEventCodec(lex, binner)
-    s = stays[0]
-    span = c.encode(stay_segment(s))
-    out = c.decode(span)
-    g, m = to_grid(s)
-    assert (out["mask"] == m).all()
-    for j, v in enumerate(TS_VARS):
-        if m[:, j].any():
-            np.testing.assert_allclose(out["grid"][m[:, j], j], binner.value(v, binner.bin(v, g[m[:, j], j])), rtol=1e-5)
-    assert out["static"]["Age"] == pytest.approx(binner.value("Age", binner.bin("Age", 60.0)))
-    assert np.isnan(out["static"]["Height"])
+# ------------------------------------------------------------------ serialisation
+class DummyCodec:
+    """Exact codec over small int arrays, for protocol-level tests."""
+
+    def __init__(self, modality, rep="vq", rng_name="image_vq"):
+        self.modality, self.rep, self.r = modality, rep, RANGES[rng_name]
+
+    def encode(self, seg):
+        a = np.asarray(seg.data)
+        if self.rep == "continuous":
+            return TokenSpan.make([CONT] * len(a), "continuous", t=[seg.t_start] * len(a),
+                                  cont=np.stack([a, a * 2], 1).astype(np.float16))
+        return TokenSpan.make(self.r.start + a, self.rep, t=[seg.t_start] * len(a),
+                              pos=[[i, -1, -1] for i in range(len(a))], conf=np.linspace(0, 1, len(a)))
+
+    def decode(self, span):
+        if self.rep == "continuous":
+            return span.cont[:, 0].astype(int)
+        return span.ids - self.r.start
 
 
-def test_ts_patch_codecs_shapes(stays, lex, binner):
-    model = TSPatchVQ(n_codes=64)
-    norm = Normalizer().fit(stays)
-    for C in (TSVQCodec, TSContCodec):
-        c = C(lex, binner, model, norm)
-        span = c.encode(stay_segment(stays[1]))
-        out = c.decode(span)
-        assert out["grid"].shape == (48, len(TS_VARS))
-    vq = TSVQCodec(lex, binner, model, norm).encode(stay_segment(stays[1]))
-    assert (vq.ids == SPECIAL["<patch>"]).sum() == 12
-    assert sum(int(i) in RANGES["ts_vq"] for i in vq.ids) == 48
+def make_sample():
+    return Sample("s1", [Segment("timeseries", np.array([5, 6, 7]), 30.0),
+                         Segment("image", np.array([1, 2, 3, 4]), 0.0),
+                         Segment("video", np.array([9, 8]), 90.0)], labels={"y": 1})
 
 
-def test_image_codecs():
-    model = ImageVQVAE(n_codes=32, dim=8, hidden=16)
-    img = np.random.default_rng(0).integers(0, 255, (28, 28, 3), dtype=np.uint8)
-    vq = ImageVQCodec(model).encode(Segment("image", img))
-    assert len(vq.ids) == 56 and (vq.ids == SPECIAL["<row>"]).sum() == 7
-    assert ImageVQCodec(model).decode(vq).shape == (28, 28, 3)
-    ct = ImageContCodec(model).encode(Segment("image", img))
-    assert ct.cont.shape == (49, 8) and ImageContCodec(model).decode(ct).dtype == np.uint8
+CODECS = {"image": DummyCodec("image"), "timeseries": DummyCodec("timeseries", "continuous", "ts_vq"),
+          "video": DummyCodec("video", "event", "segment")}
 
 
-def test_surgical_event_exact_roundtrip(lex):
-    ann = synthetic_cholec80(900, seed=3)
-    c = SurgicalEventCodec(lex)
-    span = c.encode(Segment("video", ann))
-    out = c.decode(span)
-    assert (out["phase"] == ann["phase"]).all() and (out["tools"] == ann["tools"]).all()
-    assert c.raw_bits(Segment("video", ann)) > c.span_bits(span)
-
-
-def test_video_frame_vq():
-    model = ImageVQVAE(n_codes=32, dim=8, hidden=16)
-    frames = np.zeros((3, 28, 28, 3), np.uint8)
-    c = VideoFrameVQCodec(model)
-    span = c.encode(Segment("video", frames, meta={"fps": 1}))
-    assert (span.ids == SPECIAL["<frame>"]).sum() == 3 and all(int(i) in RANGES["video_vq"] for i in span.ids if i != SPECIAL["<frame>"])
-    assert c.decode(span).shape == frames.shape
-
-
-def test_pointcloud_codec():
-    clouds = [synthetic_organ_surface(1024, seed=i) for i in range(6)]
-    c = PointCloudVoxelCodec(res=8).fit(clouds, k=64)
-    span = c.encode(Segment("pointcloud", clouds[0]))
-    rec = c.decode(span)
-    assert rec.shape == clouds[0].shape
-    extent = float((clouds[0].max(0) - clouds[0].min(0)).max())
-    assert chamfer(clouds[0], rec) < 0.05 * extent
-
-
-# ------------------------------------------------------------ serialization
-def _sample(stays, text):
-    return Sample("s0", [Segment("text", text, 0.0), stay_segment(stays[0])], labels={"death": 1})
-
-
-def test_serialize_validate_deserialize(tmp_path, stays, lex, binner, text_codec):
-    codecs = {"text": text_codec, "timeseries": TSEventCodec(lex, binner)}
-    text = "Patient is a 60 y/o male."
-    seq = serialize(_sample(stays, text), codecs)
+def test_serialize_layout_and_validate():
+    seq = serialize(make_sample(), CODECS)
     validate(seq)
-    assert seq.ids[0] == SPECIAL["<bos>"] and seq.ids[-1] == SPECIAL["<eos>"]
-    dec = deserialize(seq, codecs)
-    assert dec[0] == ("text", text)
-    seq.save(tmp_path / "s.npz")
-    seq2 = TokenSequence.load(tmp_path / "s.npz")
-    assert (seq2.ids == seq.ids).all() and seq2.spans == seq.spans and seq2.labels == {"death": 1}
+    assert seq.ids[0] == BOS and seq.ids[-1] == EOS
+    # segments are sorted by time: image (t=0) first, then timeseries (30), then video (90)
+    assert [sp["modality"] for sp in seq.spans] == ["image", "timeseries", "video"]
+    first = seq.spans[0]
+    assert seq.ids[first["start"] - 2] == SPECIAL["<IMAGE_START>"]
+    assert int(seq.ids[seq.spans[1]["start"] - 3]) in RANGES["dt"]            # <DT> before the 2nd span
+    assert seq.conf is not None and np.isnan(seq.conf[0])
 
 
-def test_drop_modality_keeps_valid_sequence(stays, lex, binner, text_codec):
-    codecs = {"text": text_codec, "timeseries": TSEventCodec(lex, binner)}
-    seq = serialize(_sample(stays, "Patient is a 60 y/o male."), codecs)
-    for m in ("text", "timeseries"):
-        d = drop_modality(seq, m)
-        validate(d)
-        assert [sp["modality"] for sp in d.spans] == [x for x in ("text", "timeseries") if x != m]
+def test_roundtrip_through_npz_and_deserialize(tmp_path):
+    s = make_sample()
+    seq = serialize(s, CODECS)
+    seq.save(tmp_path / "x.npz")
+    seq2 = TokenSequence.load(tmp_path / "x.npz")
+    validate(seq2)
+    np.testing.assert_array_equal(seq.ids, seq2.ids)
+    np.testing.assert_array_equal(seq.pos, seq2.pos)
+    out = dict(deserialize(seq2, CODECS))
+    np.testing.assert_array_equal(out["image"], [1, 2, 3, 4])
+    np.testing.assert_array_equal(out["timeseries"], [5, 6, 7])
+    np.testing.assert_array_equal(out["video"], [9, 8])
 
 
-def test_unified_transformer_mixed_batch(stays, lex, binner, text_codec):
-    model_ts = TSPatchVQ(n_codes=64)
-    norm = Normalizer().fit(stays)
-    seqs = [serialize(_sample(stays, "note"), {"text": text_codec, "timeseries": C(lex, binner, model_ts, norm)})
-            for C in (TSVQCodec, TSContCodec)]
-    seqs.append(serialize(_sample(stays, "note"), {"text": text_codec, "timeseries": TSEventCodec(lex, binner)}))
-    b = collate(seqs, "death")
-    assert b["cont_mask"].sum() == 48
-    m = UnifiedTransformer({"mortality": 2}, {"timeseries": 16}, d=32, layers=1, heads=2)
-    out = m(b, "mortality")
-    assert out.shape == (3, 2) and torch.isfinite(out).all()
+def test_medical_token_view_roundtrip(tmp_path, lex):
+    seq = serialize(make_sample(), CODECS)
+    toks = to_tokens(seq, lex)
+    assert toks[0].token_type == TokenType.SEQUENCE_BOUNDARY and toks[0].modality is None
+    starts = [t for t in toks if t.token_type == TokenType.MODALITY_START]
+    assert [t.modality for t in starts] == ["image", "timeseries", "video"]
+    assert any(t.embedding is not None for t in toks)
+    back = from_tokens(toks, seq.labels)
+    validate(back)
+    for f in ("ids", "mod", "t", "pos"):
+        np.testing.assert_array_equal(getattr(back, f), getattr(seq, f))
+    assert back.spans == seq.spans
+    np.testing.assert_array_equal(back.cont[0], seq.cont[0])
+    write_jsonl(seq, tmp_path / "x.jsonl", lex)
+    j = read_jsonl(tmp_path / "x.jsonl")
+    np.testing.assert_array_equal(j.ids, seq.ids)
+    assert j.labels == {"y": 1}
+
+
+def test_token_types_cover_every_id():
+    kinds = {token_type(i) for i in range(VOCAB_SIZE)}
+    assert TokenType.CODE in kinds and TokenType.SUBWORD in kinds and TokenType.CONTINUOUS in kinds
+
+
+def test_shard_roundtrip(tmp_path):
+    seqs = [serialize(make_sample(), CODECS) for _ in range(3)]
+    seqs[1].sample_id = "other"
+    save_shard(str(tmp_path / "s.npz"), seqs, {"k": 1})
+    back, meta = load_shard(str(tmp_path / "s.npz"))
+    assert meta == {"k": 1} and len(back) == 3 and back[1].sample_id == "other"
+    for a, b in zip(seqs, back):
+        np.testing.assert_array_equal(a.ids, b.ids)
+        assert a.spans == b.spans
+        np.testing.assert_array_equal(a.cont[0], b.cont[0])
+        validate(b)
+
+
+def test_drop_modality_keeps_valid_sequence():
+    seq = serialize(make_sample(), CODECS)
+    for m in ("image", "timeseries", "video"):
+        out = drop_modality(seq, m)
+        validate(out)
+        assert m not in [sp["modality"] for sp in out.spans]
+        assert int(out.ids[1]) not in RANGES["dt"]
+    out = dict(deserialize(drop_modality(seq, "image"), CODECS))
+    np.testing.assert_array_equal(out["video"], [9, 8])
+
+
+def test_validate_rejects_corruption():
+    seq = serialize(make_sample(), CODECS)
+    seq.ids = seq.ids.copy()
+    seq.ids[seq.spans[0]["end"]] = SPECIAL["<VIDEO_END>"]
+    with pytest.raises(ValueError):
+        validate(seq)
+
+
+def test_protocol_version_mismatch(tmp_path):
+    seq = serialize(make_sample(), CODECS)
+    d = seq.to_npz_dict()
+    import json
+    h = json.loads(bytes(d["header"]).decode())
+    h["protocol_version"] = "9.9"
+    d["header"] = np.frombuffer(json.dumps(h).encode(), np.uint8)
+    with pytest.raises(ValueError):
+        TokenSequence.from_npz_dict(d)
+
+
+def test_split_spans_inverse_of_layout():
+    s = make_sample()
+    spans = [CODECS[g.modality].encode(g) for g in s.segments]
+    seq = serialize_spans(s, spans)
+    got = split_spans(seq)
+    order = sorted(range(3), key=lambda i: s.segments[i].t_start)
+    for g, i in zip(got, order):
+        np.testing.assert_array_equal(g.ids, spans[i].ids)

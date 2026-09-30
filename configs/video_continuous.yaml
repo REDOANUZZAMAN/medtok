@@ -1,0 +1,4 @@
+base: video_vq.yaml
+name: video_continuous
+representation: continuous
+quantizer: {type: none}

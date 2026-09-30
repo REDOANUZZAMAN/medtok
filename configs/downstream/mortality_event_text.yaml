@@ -1,0 +1,5 @@
+# Multimodal sample (templated admission note + time-series events); plus the same model with text dropped.
+base: _base.yaml
+name: ds_mortality_event_text
+tasks:
+  - {task: mortality, tokenizer_run: experiments/timeseries_event, include_text: true}

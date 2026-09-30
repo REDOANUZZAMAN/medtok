@@ -1,0 +1,4 @@
+base: _base.yaml
+name: ds_mortality_vq
+tasks:
+  - {task: mortality, tokenizer_run: experiments/timeseries_vq}

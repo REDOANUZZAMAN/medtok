@@ -1,0 +1,4 @@
+base: timeseries_vq.yaml
+name: timeseries_continuous
+representation: continuous
+quantizer: {type: none}

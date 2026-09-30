@@ -1,12 +1,18 @@
+# --- data: never commit raw, processed or patient-level derived data (dataset licences / course rules)
+data/raw/
+data/processed/
+data/samples/
+# --- experiment outputs: checkpoints, codebooks and token shards stay local; aggregated tables and
+#     figures regenerated from them live in reports/ and ARE committed
+experiments/
+checkpoints/
+*.pt
+*.pth
+*.ckpt
+# --- python / tooling
 .venv/
 __pycache__/
 *.pyc
-data/raw/
-data/processed/
-checkpoints/
-*.pt
+*.egg-info/
 .pytest_cache/
-# Never commit patient-level derived data (PhysioNet licence / course data-usage rules)
-data/samples/
-artifacts/
-data/samples_demo/
+.ipynb_checkpoints/

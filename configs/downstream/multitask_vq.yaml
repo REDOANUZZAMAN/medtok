@@ -1,0 +1,7 @@
+# One shared model, one token format, three tasks from three modalities (all VQ tokens).
+base: _base.yaml
+name: ds_multitask_vq
+tasks:
+  - {task: bloodmnist, tokenizer_run: experiments/image_vq}
+  - {task: mortality, tokenizer_run: experiments/timeseries_vq}
+  - {task: surgical_phase, tokenizer_run: experiments/video_vq}

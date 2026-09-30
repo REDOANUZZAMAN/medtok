@@ -1,0 +1,38 @@
+# B. Vector quantisation -- PhysioNet 2012 window tokenizer (4 h windows, 4 product-quantised tokens each)
+name: timeseries_vq
+seed: 0
+output_dir: experiments
+modality: timeseries
+representation: vq
+data:
+  dataset: physionet2012
+  root: data/raw/physionet2012
+  processed: data/processed
+  split_seed: 0
+  steps: 48             # grid length
+  resolution_min: 60    # sampling interval of the grid (minutes)
+  fill: zero            # missing-value handling for the encoder input (mask always given): zero | locf
+model:
+  window: 4             # steps per window
+  stride: 4             # window stride (stride < window -> overlap-add decoding)
+  groups: 4             # tokens per window
+  dim: 16
+  hidden: 256
+quantizer:
+  type: vq
+  n_codes: 512
+  update: ema
+  beta: 0.25
+  decay: 0.99
+  normalize: true
+  restart_dead: true
+train:
+  optimizer: adamw
+  batch_size: 64
+  lr: 1.0e-3
+  weight_decay: 1.0e-4
+  epochs: 100
+  eval_every: 10
+  hide_fraction: 0.2    # denoising: fraction of observed cells hidden from the encoder but scored
+tokens:
+  skip_empty: false     # true -> <MISSING> instead of codes for windows without any observation

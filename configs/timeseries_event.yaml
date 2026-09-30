@@ -1,0 +1,6 @@
+# C. Event-based tokens -- one <VAR><VBIN> event per observed (hour, variable) cell; nothing is learned
+# except per-variable quantile bins on the training split.
+base: timeseries_vq.yaml
+name: timeseries_event
+representation: event
+event: {mode: obs, n_value_bins: 16}

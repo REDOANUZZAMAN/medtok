@@ -1,0 +1,5 @@
+# A. Continuous projection -- same autoencoder, no quantiser (latents stay continuous)
+base: image_vq.yaml
+name: image_continuous
+representation: continuous
+quantizer: {type: none}

@@ -1,0 +1,35 @@
+# B. Vector quantisation -- MedMNIST image tokenizer (VQ-VAE, EMA codebook, cosine lookup, dead-code restarts)
+name: image_vq
+seed: 0
+output_dir: experiments
+modality: image
+representation: vq
+data:
+  dataset: medmnist
+  root: data/raw/medmnist
+  subsets: [bloodmnist, pneumoniamnist, dermamnist]
+  image_size: 28
+  train_fraction: 1.0
+model:
+  arch: conv
+  patch_size: 4        # 28x28 -> 7x7 tokens
+  dim: 32              # token embedding dimension
+  hidden: 96
+  n_res: 2
+quantizer:
+  type: vq
+  n_codes: 512
+  update: ema
+  beta: 0.25
+  decay: 0.99
+  normalize: true
+  restart_dead: true
+  restart_threshold: 1.0
+train:
+  optimizer: adamw
+  batch_size: 128
+  lr: 2.0e-3
+  weight_decay: 1.0e-4
+  epochs: 10
+evaluate:
+  subsets: [bloodmnist, pneumoniamnist, dermamnist]

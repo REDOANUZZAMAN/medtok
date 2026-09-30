@@ -1,0 +1,19 @@
+# python -m medical_tokenizer.data.prepare --config configs/data.yaml
+medmnist:
+  root: data/raw/medmnist
+  subsets: [bloodmnist, pneumoniamnist, dermamnist]
+  image_size: 28
+physionet2012:
+  root: data/raw/physionet2012
+  processed: data/processed
+  split_seed: 0
+cataract101:
+  zip: data/raw/cataract101/cataract-101.zip   # obtain manually, see docs/datasets.md
+  cache: data/processed/cataract101_2fps_64
+  fps: 2.0          # cache rate; experiments subsample (1.0, 0.5, ...)
+  size: 64
+  workers: 4
+  split_seed: 0
+text:
+  vocab_size: 1024
+assets: data/processed/assets

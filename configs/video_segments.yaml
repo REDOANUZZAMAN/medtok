@@ -1,0 +1,11 @@
+# C. Event-based tokens for video WITHOUT annotations: k-means appearance states over pooled clip latents
+# of the continuous encoder; consecutive clips in one state merge into <SEG:k> <DT:duration>.
+# The states have no surgical meaning (see docs/token_protocol.md).
+base: video_vq.yaml
+name: video_segments
+representation: event
+quantizer: {type: none}
+segments:
+  encoder_run: experiments/video_continuous
+  n_states: 32
+  iters: 50

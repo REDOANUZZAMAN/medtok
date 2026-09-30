@@ -1,0 +1,39 @@
+# B. Vector quantisation -- Cataract-101 clip tokenizer (8 frames @ 1 fps, 64 px -> 2 x 4 x 4 tokens per clip)
+name: video_vq
+seed: 0
+output_dir: experiments
+modality: video
+representation: vq
+data:
+  dataset: cataract101
+  cache: data/processed/cataract101_2fps_64
+  split_seed: 0
+  fps: 1.0              # frame sampling rate (must divide the cache rate, 2 fps)
+  clip_len: 8           # frames per clip (clip stride = clip_len, no overlap)
+  size: 64
+  max_clips_per_video: 40
+  val_clips_per_video: 8
+  window_clips: 4       # downstream window: 4 clips = 32 s of context
+  window_stride_clips: 1
+model:
+  patch_size: 16
+  temporal_stride: 4
+  dim: 32
+  hidden: 64
+  n_res: 1
+quantizer:
+  type: vq
+  n_codes: 512
+  update: ema
+  beta: 0.25
+  decay: 0.99
+  normalize: true
+  restart_dead: true
+train:
+  optimizer: adamw
+  batch_size: 32
+  lr: 1.0e-3
+  weight_decay: 1.0e-4
+  epochs: 8
+evaluate:
+  ssim_every_nth_frame: 8

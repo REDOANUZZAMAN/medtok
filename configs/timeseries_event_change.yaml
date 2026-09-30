@@ -1,0 +1,4 @@
+# C'. Event tokens with generic change-point segmentation: emit only when a variable's bin changes
+base: timeseries_event.yaml
+name: timeseries_event_change
+event: {mode: change, n_value_bins: 16}

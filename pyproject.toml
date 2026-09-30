@@ -1,9 +1,25 @@
 [project]
-name = "medtok"
-version = "0.1.0"
-description = "Medical multimodal tokenizer and unified token protocol (text, 2D imaging, physiological time-series; interfaces for surgical video and 3D point clouds)"
+name = "medical-tokenizer"
+version = "0.2.0"
+description = "Medical multimodal tokenizer and unified token protocol: 2D images, surgical video and physiological time-series (full), clinical text and 3D point clouds (interfaces)"
+readme = "README.md"
+license = {text = "MIT"}
 requires-python = ">=3.10"
-dependencies = ["torch>=2.2", "numpy", "scipy", "scikit-learn", "pandas", "tqdm", "pyyaml", "tokenizers", "medmnist", "matplotlib"]
+dependencies = [
+  "torch>=2.2",
+  "numpy>=1.24",
+  "scipy",
+  "scikit-learn",
+  "scikit-image",
+  "pyyaml",
+  "tokenizers",
+  "matplotlib",
+  "pillow",
+]
+
+[project.optional-dependencies]
+video = ["av>=12"]
+dev = ["pytest"]
 
 [build-system]
 requires = ["setuptools>=64"]
