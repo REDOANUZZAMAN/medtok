@@ -11,7 +11,6 @@ plus modality assets (value bins, normaliser, segment states).
 from __future__ import annotations
 
 import json
-import math
 import os
 import shutil
 import time
@@ -261,6 +260,3 @@ def train(cfg: dict) -> Run:
     TRAINERS[cfg["modality"]](cfg, run)
     return run
 
-
-def epochs_budget_note(cfg: dict, n: int) -> str:
-    return f"{cfg['train']['epochs']} epochs x {math.ceil(n / cfg['train']['batch_size'])} steps"

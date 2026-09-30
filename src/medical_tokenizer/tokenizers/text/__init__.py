@@ -1,1 +1,3 @@
-from .codec import *  # noqa: F401,F403
+from .codec import ClinicalTextTokenizer
+
+__all__ = ["ClinicalTextTokenizer"]
