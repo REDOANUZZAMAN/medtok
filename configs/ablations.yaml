@@ -1,0 +1,44 @@
+# Ablations at a reduced, equal training budget. Each group has its own reference run
+# (the base setting at the same budget) so comparisons are like-for-like.
+#   python -m medical_tokenizer.pipeline --config configs/ablations.yaml --skip-existing [--only abl_image]
+output_dir: experiments
+evaluate_after: true      # every trained ablation is evaluated on its test split
+steps:
+  # ---- image codebook size K (conv, patch 4, dim 32, 5 epochs)
+  - {train: configs/image_vq.yaml, name: abl_image_k64, set: [train.epochs=5, quantizer.n_codes=64], tags: [abl_image]}
+  - {train: configs/image_vq.yaml, name: abl_image_k128, set: [train.epochs=5, quantizer.n_codes=128], tags: [abl_image]}
+  - {train: configs/image_vq.yaml, name: abl_image_k256, set: [train.epochs=5, quantizer.n_codes=256], tags: [abl_image]}
+  - {train: configs/image_vq.yaml, name: abl_image_k512, set: [train.epochs=5], tags: [abl_image]}
+  - {train: configs/image_vq.yaml, name: abl_image_k1024, set: [train.epochs=5, quantizer.n_codes=1024], tags: [abl_image]}
+  # ---- image token dimension
+  - {train: configs/image_vq.yaml, name: abl_image_dim8, set: [train.epochs=5, model.dim=8], tags: [abl_image]}
+  - {train: configs/image_vq.yaml, name: abl_image_dim64, set: [train.epochs=5, model.dim=64], tags: [abl_image]}
+  # ---- image patch size (one architecture for all: ViT-style patch embedding)
+  - {train: configs/image_vq.yaml, name: abl_image_patch2, set: [train.epochs=5, model.arch=patch, model.patch_size=2], tags: [abl_image]}
+  - {train: configs/image_vq.yaml, name: abl_image_patch4, set: [train.epochs=5, model.arch=patch, model.patch_size=4], tags: [abl_image]}
+  - {train: configs/image_vq.yaml, name: abl_image_patch7, set: [train.epochs=5, model.arch=patch, model.patch_size=7], tags: [abl_image]}
+  # ---- codebook-collapse remedies, switched off one at a time (K=512, 5 epochs)
+  - {train: configs/image_vq.yaml, name: abl_image_norestart, set: [train.epochs=5, quantizer.restart_dead=false], tags: [abl_image]}
+  - {train: configs/image_vq.yaml, name: abl_image_nocosine, set: [train.epochs=5, quantizer.normalize=false], tags: [abl_image]}
+  - {train: configs/image_vq.yaml, name: abl_image_lossupdate, set: [train.epochs=5, quantizer.update=loss], tags: [abl_image]}
+  - {train: configs/image_vq_vanilla.yaml, name: abl_image_vanilla, set: [train.epochs=5], tags: [abl_image]}
+  # ---- time-series codebook size
+  - {train: configs/timeseries_vq.yaml, name: abl_ts_k64, set: [quantizer.n_codes=64], tags: [abl_ts]}
+  - {train: configs/timeseries_vq.yaml, name: abl_ts_k128, set: [quantizer.n_codes=128], tags: [abl_ts]}
+  - {train: configs/timeseries_vq.yaml, name: abl_ts_k1024, set: [quantizer.n_codes=1024], tags: [abl_ts]}
+  # ---- time-series window size (steps per window; tokens per window fixed at 4)
+  - {train: configs/timeseries_vq.yaml, name: abl_ts_win2, set: [model.window=2, model.stride=2], tags: [abl_ts]}
+  - {train: configs/timeseries_vq.yaml, name: abl_ts_win8, set: [model.window=8, model.stride=8], tags: [abl_ts]}
+  - {train: configs/timeseries_vq.yaml, name: abl_ts_win8_stride4, set: [model.window=8, model.stride=4], tags: [abl_ts]}
+  # ---- time-series sampling interval (grid resolution), 4 h windows throughout
+  - {train: configs/timeseries_vq.yaml, name: abl_ts_res30, set: [data.resolution_min=30, data.steps=96, model.window=8, model.stride=8], tags: [abl_ts]}
+  - {train: configs/timeseries_vq.yaml, name: abl_ts_res120, set: [data.resolution_min=120, data.steps=24, model.window=2, model.stride=2], tags: [abl_ts]}
+  # ---- time-series missing-value handling and collapse remedies
+  - {train: configs/timeseries_vq.yaml, name: abl_ts_locf, set: [data.fill=locf], tags: [abl_ts]}
+  - {train: configs/timeseries_vq.yaml, name: abl_ts_vanilla, set: ["quantizer={type: vq, n_codes: 512, update: loss, normalize: false, restart_dead: false, init: random}"], tags: [abl_ts]}
+  # ---- video temporal sampling rate and codebook size (5 epochs)
+  - {train: configs/video_vq.yaml, name: abl_video_fps0.5, set: [train.epochs=5, data.fps=0.5], tags: [abl_video]}
+  - {train: configs/video_vq.yaml, name: abl_video_fps1, set: [train.epochs=5, data.fps=1.0], tags: [abl_video]}
+  - {train: configs/video_vq.yaml, name: abl_video_fps2, set: [train.epochs=5, data.fps=2.0], tags: [abl_video]}
+  - {train: configs/video_vq.yaml, name: abl_video_k128, set: [train.epochs=5, quantizer.n_codes=128], tags: [abl_video]}
+  - {train: configs/video_vq.yaml, name: abl_video_k1024, set: [train.epochs=5, quantizer.n_codes=1024], tags: [abl_video]}

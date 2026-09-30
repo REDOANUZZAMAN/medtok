@@ -3,7 +3,7 @@
     python -m medical_tokenizer.pipeline --config configs/experiment_comparison.yaml [--skip-existing] [--only image]
 
 Step forms (paths relative to the repo root):
-    - train: configs/image_vq.yaml            # optional: name: ..., set: [key=value, ...]
+    - train: configs/image_vq.yaml            # optional: name, set: [key=value, ...], evaluate_after: true
     - evaluate: experiments/image_vq          # evaluates the experiment's latest run
     - downstream: configs/downstream/bloodmnist_vq.yaml   # optional: name, set
     - interfaces: true
@@ -45,14 +45,25 @@ def run_plan(plan: dict, skip_existing: bool = False, only: str | None = None, k
                 if step.get("name"):
                     over.append(f"name={step['name']}")
                 cfg = load_config(abspath(step[kind]), over)
-                if skip_existing and _finished(abspath(os.path.join(cfg.get("output_dir", out_root), cfg["name"]))):
+                exp_dir = abspath(os.path.join(cfg.get("output_dir", out_root), cfg["name"]))
+                eval_after = kind == "train" and step.get("evaluate_after", plan.get("evaluate_after", False))
+                if skip_existing and _finished(exp_dir):
+                    if eval_after and not _finished(exp_dir, os.path.join("eval", "metrics.json")):
+                        from .evaluate import evaluate
+                        print(f"\n===== {label}: trained, evaluating", flush=True)
+                        evaluate(exp_dir)
+                        status.append((label, "evaluated", time.time() - t0))
+                        continue
                     print(f"{label}: exists, skipped", flush=True)
                     status.append((label, "skipped", 0))
                     continue
                 print(f"\n===== {label}", flush=True)
                 if kind == "train":
                     from .trainers import train
-                    train(cfg)
+                    run = train(cfg)
+                    if eval_after:
+                        from .evaluate import evaluate
+                        evaluate(run.dir)
                 else:
                     from .downstream.__main__ import run_downstream
                     run_downstream(cfg)

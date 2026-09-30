@@ -222,6 +222,8 @@ def eval_annotated_phase_events(d: dict, vids, files) -> dict:
     out = compression_summary([codec.raw_bits(s) for s in segs], [codec.payload_bits(s) for s in spans],
                               [len(s.ids) for s in spans], [len(s.data["phase"]) for s in segs])
     out["exact_roundtrip_rate"] = exact
+    minutes = sum(len(s.data["phase"]) for s in segs) / d["fps"] / 60
+    out["tokens_per_minute"] = float(sum(len(s.ids) for s in spans) / minutes)
     return out
 
 

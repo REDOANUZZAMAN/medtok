@@ -1,0 +1,47 @@
+# Main experiment matrix: A continuous projection / B vector quantisation / C event-based tokens,
+# for each implemented modality, then downstream validation on four tasks.
+#   python -m medical_tokenizer.pipeline --config configs/experiment_comparison.yaml --skip-existing [--only image]
+output_dir: experiments
+steps:
+  # ---------------- 2D images (MedMNIST)
+  - {train: configs/image_vq.yaml, tags: [image, tokenizers]}
+  - {train: configs/image_continuous.yaml, tags: [image, tokenizers]}
+  - {train: configs/image_vq_vanilla.yaml, tags: [image, tokenizers]}
+  - {evaluate: experiments/image_vq, tags: [image, tokenizers]}
+  - {evaluate: experiments/image_continuous, tags: [image, tokenizers]}
+  - {evaluate: experiments/image_vq_vanilla, tags: [image, tokenizers]}
+  # ---------------- physiological time-series (PhysioNet 2012)
+  - {train: configs/timeseries_vq.yaml, tags: [timeseries, tokenizers]}
+  - {train: configs/timeseries_continuous.yaml, tags: [timeseries, tokenizers]}
+  - {train: configs/timeseries_event.yaml, tags: [timeseries, tokenizers]}
+  - {train: configs/timeseries_event_change.yaml, tags: [timeseries, tokenizers]}
+  - {evaluate: experiments/timeseries_vq, tags: [timeseries, tokenizers]}
+  - {evaluate: experiments/timeseries_continuous, tags: [timeseries, tokenizers]}
+  - {evaluate: experiments/timeseries_event, tags: [timeseries, tokenizers]}
+  - {evaluate: experiments/timeseries_event_change, tags: [timeseries, tokenizers]}
+  # ---------------- surgical video (Cataract-101)
+  - {train: configs/video_vq.yaml, tags: [video, tokenizers]}
+  - {train: configs/video_continuous.yaml, tags: [video, tokenizers]}
+  - {train: configs/video_segments.yaml, tags: [video, tokenizers]}
+  - {evaluate: experiments/video_vq, tags: [video, tokenizers]}
+  - {evaluate: experiments/video_continuous, tags: [video, tokenizers]}
+  - {evaluate: experiments/video_segments, tags: [video, tokenizers]}
+  # ---------------- interface modalities (text round-trip, synthetic point clouds)
+  - {interfaces: true, tags: [interfaces]}
+  # ---------------- downstream validation (3 seeds each)
+  - {downstream: configs/downstream/bloodmnist_vq.yaml, tags: [downstream, ds_image]}
+  - {downstream: configs/downstream/bloodmnist_continuous.yaml, tags: [downstream, ds_image]}
+  - {downstream: configs/downstream/pneumoniamnist_vq.yaml, tags: [downstream, ds_image]}
+  - {downstream: configs/downstream/pneumoniamnist_continuous.yaml, tags: [downstream, ds_image]}
+  - {downstream: configs/downstream/dermamnist_vq.yaml, tags: [downstream, ds_image]}
+  - {downstream: configs/downstream/dermamnist_continuous.yaml, tags: [downstream, ds_image]}
+  - {downstream: configs/downstream/mortality_event.yaml, tags: [downstream, ds_timeseries]}
+  - {downstream: configs/downstream/mortality_event_change.yaml, tags: [downstream, ds_timeseries]}
+  - {downstream: configs/downstream/mortality_vq.yaml, tags: [downstream, ds_timeseries]}
+  - {downstream: configs/downstream/mortality_continuous.yaml, tags: [downstream, ds_timeseries]}
+  - {downstream: configs/downstream/mortality_event_text.yaml, tags: [downstream, ds_timeseries]}
+  - {downstream: configs/downstream/phase_vq.yaml, tags: [downstream, ds_video]}
+  - {downstream: configs/downstream/phase_continuous.yaml, tags: [downstream, ds_video]}
+  - {downstream: configs/downstream/phase_segments.yaml, tags: [downstream, ds_video]}
+  - {downstream: configs/downstream/multitask_vq.yaml, tags: [downstream, ds_multitask]}
+  - {report: true, tags: [report]}
