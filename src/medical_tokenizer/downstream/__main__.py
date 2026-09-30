@@ -66,8 +66,10 @@ def run_downstream(cfg: dict) -> Run:
         agg[name] = {k: {"mean": float(np.mean([r["test"][name][k] for r in per_seed if k in r["test"][name]])),
                          "std": float(np.std([r["test"][name][k] for r in per_seed if k in r["test"][name]])),
                          "values": [r["test"][name].get(k) for r in per_seed]} for k in keys}
+    sec = [h["sec"] for r in per_seed for h in r["history"]]
     run.save_metrics({"tasks": info, "test": agg, "seeds": cfg.get("seeds", [cfg.get("seed", 0)]),
-                      "params": per_seed[0]["params"]})
+                      "params": per_seed[0]["params"], "train_sec_per_epoch": float(np.mean(sec)),
+                      "epochs_run": [r["epochs_run"] for r in per_seed]})
     for name in tasks:
         m = tasks[name].select_metric
         print(f"{name}: test {m} {agg[name][m]['mean']:.4f} ± {agg[name][m]['std']:.4f}", flush=True)

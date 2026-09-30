@@ -26,9 +26,10 @@ All three time-series representations carry the same discrete static block (age,
    - compression (§ bit accounting in `docs/token_protocol.md`);
    - sequence length;
    - codebook utilisation: active codes, utilisation, entropy, perplexity, dead %, top-10 % share.
-3. **Downstream validation** (`python -m medical_tokenizer.downstream`). The same `UnifiedTokenTransformer` (d = 128, 4 layers, 4 heads, ≈ 2.6 M parameters, mostly the 13,824 × 128 token embedding) is trained from scratch on the token shards:
-   - AdamW 5e-4, one-cycle schedule, up to 30 epochs;
-   - early stopping on the validation metric (patience 6), best-validation checkpoint tested once;
+3. **Downstream validation** (`python -m medical_tokenizer.downstream`). The same `UnifiedTokenTransformer` (d = 128, 2 pre-LN layers, 4 heads, 2.78 M parameters, of which 1.77 M are the 13,824 × 128 token embedding) is trained from scratch on the token shards:
+   - AdamW 5e-4, one-cycle schedule, batch 32, up to 20 epochs;
+   - early stopping on the validation metric (patience 5), best-validation checkpoint tested once;
+   - training seconds per epoch are recorded as a cost measure (self-attention cost grows with the square of sequence length);
    - **3 seeds**, reported as mean ± std.
 
    The model sees only protocol fields and never raw data.

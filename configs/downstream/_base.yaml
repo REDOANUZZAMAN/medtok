@@ -5,13 +5,13 @@ output_dir: experiments
 max_len: 2048
 model:
   d_model: 128
-  n_layers: 4
+  n_layers: 2
   n_heads: 4
   dropout: 0.1
   pe: {kind: learned, max_pos: 256}
 train:
-  epochs: 30
-  batch_size: 64
+  epochs: 20
+  batch_size: 32
   lr: 5.0e-4
   weight_decay: 0.01
-  patience: 6
+  patience: 5
