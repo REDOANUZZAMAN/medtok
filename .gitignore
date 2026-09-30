@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+data/raw/
+data/processed/
+checkpoints/
+*.pt
+.pytest_cache/
+# Never commit patient-level derived data (PhysioNet licence / course data-usage rules)
+data/samples/
+artifacts/
+data/samples_demo/
