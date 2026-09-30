@@ -88,7 +88,9 @@ class MedicalToken:
 
 
 def to_tokens(seq: TokenSequence, lex: Lexicon | None = None, text_decoder=None) -> list[MedicalToken]:
-    lex = lex or Lexicon()
+    if lex is None:
+        from ..toolkit import build_lexicon      # the project's default names for var / event ranges
+        lex = build_lexicon()
     start_meta = {sp["start"] - 2: {"rep": sp["rep"], "span_meta": sp["meta"]} for sp in seq.spans}
     # map every <CONT> position to its vector
     cont_at, ci = {}, 0

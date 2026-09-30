@@ -36,7 +36,11 @@ class _ImageCodec(Codec):
         self.g = model.grid
 
     def raw_bits(self, seg: Segment) -> float:
-        return float(np.asarray(seg.data).size * 8)
+        """8 bits per stored value; a grayscale image replicated to RGB counts one channel."""
+        x = np.asarray(seg.data)
+        if x.ndim == 3 and x.shape[2] == 3 and (x[..., 0] == x[..., 1]).all() and (x[..., 0] == x[..., 2]).all():
+            return float(x.shape[0] * x.shape[1] * 8)
+        return float(x.size * 8)
 
     @torch.no_grad()
     def latents(self, imgs: np.ndarray) -> torch.Tensor:

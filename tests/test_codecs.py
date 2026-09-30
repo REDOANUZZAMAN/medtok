@@ -269,3 +269,13 @@ def test_multimodal_sample_to_tokens_and_back(stays, lex, binner, spec, norm, te
     assert out["timeseries"]["grid"].shape == (48, 37)
     assert out["video"]["frames"].shape == frames.shape
     assert out["pointcloud"].shape == pts.shape
+
+
+def test_image_raw_bits_grayscale_counts_one_channel():
+    m = ImageAutoencoder(dim=8, hidden=16, quantizer=VQ).eval()
+    c = ImageVQCodec(m)
+    g = np.repeat(np.arange(784, dtype=np.uint8).reshape(28, 28, 1), 3, -1)
+    assert c.raw_bits(Segment("image", g)) == 28 * 28 * 8
+    rgb = g.copy()
+    rgb[0, 0, 1] += 1
+    assert c.raw_bits(Segment("image", rgb)) == 28 * 28 * 3 * 8

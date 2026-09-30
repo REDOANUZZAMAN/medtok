@@ -1,71 +1,99 @@
-# MedTok: a medical multimodal tokenizer and unified token protocol
+# Medical Multimodal Tokenizer & Unified Token Protocol
 
-Final-year project: *Design of a Medical Multimodal-Specific Tokenizer and a Unified Data Protocol* (Task 1.1 Multimodal Data Semantic Integration, Task 1.2 Multi-dimensional Tokenizer).
+Undergraduate research project: **Design of a Medical Multimodal-Specific Tokenizer and a Unified Data Protocol** (Task 1.2 Multi-dimensional Tokenizer; Task 1.1 Multimodal Data Semantic Integration).
 
-MedTok maps clinical text, 2D medical images and physiological time-series (fully implemented), plus surgical-video events and 3D point clouds (interfaces with synthetic demos), into **one 13,056-id vocabulary and one sequence format**. On that format it compares three representation types: **continuous projection**, **vector quantization** and **event-based tokens**. The comparison covers compression, reconstruction and codebook utilization, and performance on two downstream tasks, in-hospital mortality prediction and MedMNIST classification. Both tasks are also solved together by a single shared model.
+The project converts heterogeneous medical data into **one discrete token vocabulary (13,824 ids) and one sequence format**, so that a single Transformer can consume any mix of modalities. On that format it compares three representation strategies:
 
-## Deliverables
+- **A. continuous projection**;
+- **B. vector quantisation**;
+- **C. event-based tokens**.
 
-| Deliverable (from the brief) | Where |
+The comparison measures compression ratio, reconstruction error, codebook utilisation, sequence length and downstream task performance.
+
+| Modality | Data | Status |
+|---|---|---|
+| 2D medical images | MedMNIST v2 (Blood / Pneumonia / Derma) | full: VQ + continuous tokenizers, 3 classification tasks |
+| Physiological time-series | PhysioNet 2012 (4,000 ICU stays) | full: event (2 variants) + VQ + continuous, mortality prediction |
+| Surgical video | Cataract-101 (101 surgeries, 10 phases) — open stand-in for request-only Cholec80 | full: VQ + continuous + unsupervised segment events, online phase recognition; annotation-event codec |
+| Clinical text | templated notes (no open clinical free text in scope) | interface: exact byte-level BPE codec, pluggable sub-word tokenizer |
+| 3D point clouds | synthetic surfaces (SCARED is request-only) | interface: normalise → voxel groups → features → codebook |
+
+**Results** are generated from experiment outputs, never typed in:
+
+- [`reports/RESULTS.md`](reports/RESULTS.md) — tables and figures;
+- [`docs/experiments.md`](docs/experiments.md) — experiment protocol, findings and limitations.
+
+## Documentation
+
+| | |
 |---|---|
-| Data protocol and lexicon specification | [`docs/PROTOCOL.md`](docs/PROTOCOL.md), `artifacts/lexicon.json` |
-| Tokenizer toolkit | `src/medtok/` (codecs, protocol, quantizers, downstream model), tests in `tests/` |
-| Cross-modal sample set | built by `scripts/04_build_samples.py` into `data/samples/` (git-ignored, patient-level); synthetic five-modality example in `data/samples_demo/` |
-| Compression and downstream evaluation report | [`docs/REPORT.md`](docs/REPORT.md), raw numbers in `artifacts/results/*.json` |
+| [`docs/token_protocol.md`](docs/token_protocol.md) | formal protocol / lexicon specification: id ranges, special tokens, layout, positions, reversibility, bit accounting |
+| [`docs/architecture.md`](docs/architecture.md) | components, design decisions, CLI |
+| [`docs/datasets.md`](docs/datasets.md) | datasets, licences, splits, data-handling rules |
+| [`docs/experiments.md`](docs/experiments.md) | experiment matrix, ablations, results discussion |
 
-## Layout
-
-```
-src/medtok/
-  protocol/   vocab.py (id ranges, special/dt tokens, Lexicon)  schema.py (Sample/Segment/TokenSequence)  serialize.py
-  codecs/     text.py  image.py  timeseries.py  video.py  pointcloud.py   (all implement codecs/base.py:Codec)
-  quant/      vq.py (EMA vector quantizer + dead-code restart)  models.py (image VQ-VAE, time-series patch VQ)
-  data/       physionet.py  medmnist_data.py  notes.py  build.py
-  eval/       downstream.py (UnifiedTransformer over any TokenSequence)
-  toolkit.py  load lexicon + all trained codecs in one call
-scripts/      01..08 pipeline (below)
-docs/         PROTOCOL.md  REPORT.md  figures/
-```
-
-## Reproduce (CPU only, about 3–4 h on 6 cores)
+## Quick start (CPU is enough)
 
 ```bash
-python3 -m venv .venv
-.venv/bin/pip install torch --index-url https://download.pytorch.org/whl/cpu
-.venv/bin/pip install -e . pytest
+python3 -m venv .venv && . .venv/bin/activate
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+pip install -e ".[video,dev]"
+pytest -q                                              # synthetic-data unit + end-to-end tests, no downloads
 
-# data: PhysioNet 2012 set-a + MedMNIST v2 (28 px)
-mkdir -p data/raw/physionet2012 data/raw/medmnist
-(cd data/raw/physionet2012 && for f in set-a.tar.gz Outcomes-a.txt; do curl -sSLO https://physionet.org/files/challenge-2012/1.0.0/$f; done && tar xzf set-a.tar.gz)
-(cd data/raw/medmnist && for s in bloodmnist pneumoniamnist dermamnist; do curl -sSLO https://zenodo.org/records/10519652/files/$s.npz; done)
+python -m medical_tokenizer.data.prepare --config configs/data.yaml     # MedMNIST + PhysioNet (+ Cataract-101 if placed)
+python -m medical_tokenizer.train      --config configs/image_vq.yaml
+python -m medical_tokenizer.evaluate   --run experiments/image_vq
+python -m medical_tokenizer.downstream --config configs/downstream/bloodmnist_vq.yaml
 
-.venv/bin/python scripts/01_prepare.py            # lexicon, BPE, value bins, normaliser (train split only)
-.venv/bin/python scripts/02_train_image_vq.py --epochs 10
-.venv/bin/python scripts/03_train_ts_vq.py
-.venv/bin/python scripts/04_build_samples.py      # tokenise the cross-modal sample set, every representation
-.venv/bin/python scripts/05_eval_compression.py   # compression / reconstruction / utilisation
-.venv/bin/python scripts/06_downstream.py         # downstream tasks, 3 seeds
-.venv/bin/python scripts/07_interface_demos.py    # video + point-cloud interfaces, five-modality sample
-.venv/bin/python scripts/08_figures.py
-.venv/bin/python -m pytest -q
+# everything (main matrix, then ablations, then tables / figures)
+python -m medical_tokenizer.pipeline --config configs/experiment_comparison.yaml --skip-existing
+python -m medical_tokenizer.pipeline --config configs/ablations.yaml --skip-existing
+python -m medical_tokenizer.report
 ```
 
 ## Using the toolkit
 
 ```python
-from medtok.toolkit import Toolkit
-from medtok.protocol.schema import Sample, Segment
-from medtok.protocol.serialize import serialize, deserialize
+from medical_tokenizer.toolkit import load_tokenizer, load_text_tokenizer, MultimodalCodec
+from medical_tokenizer.protocol import Sample, Segment, to_tokens, write_jsonl
 
-tk = Toolkit("artifacts")
-codecs = tk.codec_set(image="vq", timeseries="event")
-sample = Sample("demo", [Segment("text", "Chest X-ray, frontal view."), Segment("image", img_uint8_28x28x3)])
-seq = serialize(sample, codecs)          # TokenSequence: ids + modality/time/position side channels
-seq.save("demo.npz")
-print([tk.lex.id_to_str(int(i), tk.text.piece) for i in seq.ids][:12])
-restored = deserialize(seq, codecs)      # [(modality, payload), ...]
+codec = MultimodalCodec({
+    "text": load_text_tokenizer(),
+    "image": load_tokenizer("experiments/image_vq"),
+    "timeseries": load_tokenizer("experiments/timeseries_event"),
+})
+sample = Sample("case-1", [Segment("text", "Chest X-ray, frontal view."),
+                           Segment("image", img_uint8_28x28x3, t_start=5.0)])
+seq = codec.encode(sample)      # TokenSequence: ids + modality / time / position side channels
+payloads = codec.decode(seq)    # [(modality, reconstruction), ...]
+write_jsonl(seq, "case-1.jsonl")  # one human-readable MedicalToken per line
 ```
 
-## Data usage
+## Repository layout
 
-MIMIC is not used. PhysioNet 2012 is open data (ODC-By), but following the course's data-usage rules no patient-level raw or derived data is committed: `data/raw`, `data/processed` and `data/samples` are git-ignored. Cholec80 and SCARED require data requests, so their codecs read the official file formats and are demonstrated on synthetic data.
+```
+configs/         YAML experiment configs (tokenizers, downstream, ablations, pipeline plans)
+src/medical_tokenizer/
+  protocol/      vocabulary, schema, serialisation, MedicalToken view, shards
+  tokenizers/    image, video, timeseries, text, pointcloud codecs
+  encoders/      lightweight autoencoders (image / time-series / video)
+  quantization/  vector quantiser + utilisation statistics
+  codecs/        Codec interface, MultimodalCodec
+  positional_encoding/  modality-aware positional encoding
+  downstream/    UnifiedTokenDataset, UnifiedTokenTransformer, tasks, training
+  evaluation/    reconstruction and compression metrics
+  data/          dataset loaders, adapters, prepare CLI
+scripts/         thin wrappers around the CLI entry points
+tests/           unit + integration tests on synthetic data
+notebooks/       token exploration (reads real experiment outputs)
+reports/         generated tables and figures (committed)
+experiments/     run directories (git-ignored: checkpoints, codebooks, token shards)
+```
+
+## Data use
+
+Only open datasets are downloaded automatically. Controlled or request-only data (MIMIC, Cholec80, SCARED) are never downloaded, and no raw or patient-level derived data is committed (see `.gitignore` and `docs/datasets.md`). Cataract-101 is CC BY-NC 4.0 (research use only). Cite Schoeffmann et al., MMSys 2018.
+
+## Licence
+
+Code: MIT (see `LICENSE`). Datasets keep their own licences.
