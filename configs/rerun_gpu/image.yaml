@@ -1,0 +1,13 @@
+# GPU job 1/4 (scripts/modal_rerun.py): K=1024 image tokenizers + all image downstream + multi-task.
+output_dir: experiments
+steps:
+  - {train: configs/image_vq.yaml, evaluate_after: true}
+  - {train: configs/image_vq_vanilla.yaml, evaluate_after: true}
+  - {evaluate: experiments/image_continuous}
+  - {downstream: configs/downstream/pneumoniamnist_vq.yaml}
+  - {downstream: configs/downstream/pneumoniamnist_continuous.yaml}
+  - {downstream: configs/downstream/bloodmnist_vq.yaml}
+  - {downstream: configs/downstream/bloodmnist_continuous.yaml}
+  - {downstream: configs/downstream/dermamnist_vq.yaml}
+  - {downstream: configs/downstream/dermamnist_continuous.yaml}
+  - {downstream: configs/downstream/multitask_vq.yaml}

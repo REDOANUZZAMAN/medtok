@@ -1,0 +1,8 @@
+# GPU job 2/4: every ICU-mortality downstream run (same hardware for the whole comparison; text = templates v2).
+output_dir: experiments
+steps:
+  - {downstream: configs/downstream/mortality_continuous.yaml}
+  - {downstream: configs/downstream/mortality_vq.yaml}
+  - {downstream: configs/downstream/mortality_event.yaml}
+  - {downstream: configs/downstream/mortality_event_change.yaml}
+  - {downstream: configs/downstream/mortality_event_text.yaml}

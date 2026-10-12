@@ -279,7 +279,7 @@ EVALUATORS = {"image": eval_image, "timeseries": eval_timeseries, "video": eval_
 def evaluate(run: str) -> dict:
     run_dir = resolve_run(run)
     cfg = load_run_config(run_dir)
-    torch.set_num_threads(int(cfg.get("threads", os.cpu_count())))
+    torch.set_num_threads(int(cfg.get("threads", os.environ.get("MEDTOK_THREADS", os.cpu_count()))))
     w = EvalWriter(run_dir)
     res = {"run": run_dir, "name": cfg.get("name"), "modality": cfg["modality"],
            "representation": cfg["representation"], **EVALUATORS[cfg["modality"]](run_dir, cfg, w)}

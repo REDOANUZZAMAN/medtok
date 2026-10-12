@@ -9,6 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ..utils.device import device, to_device
 from .dataset import UnifiedTokenDataset, length_bucketed_batches
 from .tasks import DownstreamTask, metrics
 
@@ -16,11 +17,12 @@ from .tasks import DownstreamTask, metrics
 @torch.no_grad()
 def predict(model, ds: UnifiedTokenDataset, task: str, bs: int = 128) -> tuple[np.ndarray, np.ndarray]:
     model.eval()
+    dev = next(model.parameters()).device
     order = np.argsort(ds.lengths(), kind="stable")
     ys, out = [], []
     for i in range(0, len(ds), bs):
         b = ds.collate([ds[j] for j in order[i:i + bs]])
-        out.append(model(b, task).float().numpy())
+        out.append(model(to_device(b, dev), task).float().cpu().numpy())
         ys.append(b["y"].numpy())
     inv = np.argsort(order)
     return np.concatenate(ys)[inv], np.concatenate(out)[inv]
@@ -32,6 +34,8 @@ def fit(model, data: dict[str, dict], tasks: dict[str, DownstreamTask], epochs: 
     Model selection: mean validation select_metric across tasks; the best state is restored before testing."""
     rng = np.random.default_rng(seed)
     torch.manual_seed(seed)
+    dev = device()
+    model.to(dev)
     opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     steps = epochs * sum(math.ceil(len(d["train"]) / batch_size) for d in data.values())
     sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=lr, total_steps=max(steps, 1), pct_start=0.1)
@@ -45,9 +49,10 @@ def fit(model, data: dict[str, dict], tasks: dict[str, DownstreamTask], epochs: 
         tot = 0.0
         for k, idx in plan:
             ds = data[k]["train"]
-            b = ds.collate([ds[i] for i in idx])
+            b = to_device(ds.collate([ds[i] for i in idx]), dev)
             w = tasks[k].class_weight
-            loss = F.cross_entropy(model(b, k), b["y"], weight=None if w is None else torch.tensor(w, dtype=torch.float32))
+            loss = F.cross_entropy(model(b, k), b["y"],
+                                   weight=None if w is None else torch.tensor(w, dtype=torch.float32, device=dev))
             opt.zero_grad()
             loss.backward()
             nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -70,5 +75,6 @@ def fit(model, data: dict[str, dict], tasks: dict[str, DownstreamTask], epochs: 
     if best_state is not None:
         model.load_state_dict(best_state)
     test = {k: metrics(tasks[k], *predict(model, d["test"], k)) for k, d in data.items()}
+    model.cpu()
     return {"best_val_score": best, "test": test, "history": hist, "epochs_run": len(hist),
             "params": int(sum(p.numel() for p in model.parameters()))}

@@ -28,7 +28,10 @@ from .encoders.video import VideoClipAutoencoder
 from .evaluation.reconstruction import image_metrics
 from .quantization.stats import CodeUsageTracker
 from .toolkit import build_lexicon
+from .utils.device import device
 from .utils.experiment import Run
+
+DEV = device()
 
 
 def _optimizer(model, t: dict, steps: int):
@@ -41,6 +44,7 @@ def _optimizer(model, t: dict, steps: int):
 
 
 def _finish(run: Run, model: LatentAutoencoder, final: dict, lex=None) -> None:
+    model.cpu()
     save_model(model, run.path("model.pt"))
     if model.is_discrete:
         np.save(run.path("codebook.npy"), model.quantizer.codebook.detach().numpy())
@@ -57,6 +61,7 @@ def _epoch_loop(run, model, cfg, n_train, train_step, validate):
     opt, sched = _optimizer(model, t, steps)
     g = torch.Generator().manual_seed(int(cfg.get("seed", 0)))
     val = {}
+    model.to(DEV)
     for ep in range(epochs):
         model.train()
         t0, tot, n, ppl, restarts = time.time(), 0.0, 0, [], 0
@@ -82,6 +87,7 @@ def _epoch_loop(run, model, cfg, n_train, train_step, validate):
             val = validate()
             rec.update({f"val_{k}": v for k, v in val.items()})
         run.log(rec)
+    model.cpu()
     return val
 
 
@@ -97,7 +103,7 @@ def train_image(cfg: dict, run: Run) -> None:
     xtr_t, xva_t = torch.as_tensor(xtr), torch.as_tensor(xva)
 
     def step(idx):
-        x = model.to_input(xtr_t[idx])
+        x = model.to_input(xtr_t[idx].to(DEV))
         xr, q = model(x)
         return F.mse_loss(xr, x) + q.loss, q
 
@@ -105,9 +111,9 @@ def train_image(cfg: dict, run: Run) -> None:
     def validate():
         rec, tracker = [], CodeUsageTracker(max(model.n_codes, 1))
         for i in range(0, len(xva_t), 512):
-            x = model.to_input(xva_t[i:i + 512])
+            x = model.to_input(xva_t[i:i + 512].to(DEV))
             xr, q = model(x)
-            rec.append(model.to_uint8(xr).numpy())
+            rec.append(model.to_uint8(xr).cpu().numpy())
             if q.indices is not None:
                 tracker.update(q.indices)
         m = image_metrics(xva, np.concatenate(rec), ssim=False)
@@ -168,15 +174,17 @@ def train_timeseries(cfg: dict, run: Run) -> None:
         # and still scored, so codes must capture temporal structure instead of copying cells.
         x, m = xtr[idx], mtr[idx]
         h = m & (torch.rand(m.shape, generator=g) < hide)
+        x, m, h = x.to(DEV), m.to(DEV), h.to(DEV)
         vis = m & ~h
         xr, q = model((x * vis, vis))
         return masked_mse(xr, x, m) + q.loss, q
 
     @torch.no_grad()
     def validate():
-        xr, q = model((xva, mva))
-        out = {"masked_mse_z": masked_mse(xr, xva, mva).item(),
-               "mae_z": float(((xr - xva).abs() * mva).sum() / mva.sum())}
+        xv, mv = xva.to(DEV), mva.to(DEV)
+        xr, q = model((xv, mv))
+        out = {"masked_mse_z": masked_mse(xr, xv, mv).item(),
+               "mae_z": float(((xr - xv).abs() * mv).sum() / mv.sum())}
         if q.indices is not None:
             tr = CodeUsageTracker(model.n_codes)
             tr.update(q.indices)
@@ -202,7 +210,7 @@ def train_video(cfg: dict, run: Run) -> None:
     xtr_t, xva_t = torch.as_tensor(xtr), torch.as_tensor(xva)
 
     def step(idx):
-        x = model.to_input(xtr_t[idx])
+        x = model.to_input(xtr_t[idx].to(DEV))
         xr, q = model(x)
         return F.mse_loss(xr, x) + q.loss, q
 
@@ -210,8 +218,8 @@ def train_video(cfg: dict, run: Run) -> None:
     def validate():
         rec, tracker = [], CodeUsageTracker(max(model.n_codes, 1))
         for i in range(0, len(xva_t), 32):
-            xr, q = model(model.to_input(xva_t[i:i + 32]))
-            rec.append(model.to_uint8(xr).numpy())
+            xr, q = model(model.to_input(xva_t[i:i + 32].to(DEV)))
+            rec.append(model.to_uint8(xr).cpu().numpy())
             if q.indices is not None:
                 tracker.update(q.indices)
         r = np.concatenate(rec)
@@ -255,7 +263,7 @@ def train(cfg: dict) -> Run:
     if cfg["modality"] not in TRAINERS:
         raise ValueError(f"no trainer for modality {cfg['modality']!r} (text / point cloud are interface-level)")
     run = Run(cfg)
-    torch.set_num_threads(int(cfg.get("threads", os.cpu_count())))
+    torch.set_num_threads(int(cfg.get("threads", os.environ.get("MEDTOK_THREADS", os.cpu_count()))))
     print(f"run dir: {run.dir}", flush=True)
     TRAINERS[cfg["modality"]](cfg, run)
     return run

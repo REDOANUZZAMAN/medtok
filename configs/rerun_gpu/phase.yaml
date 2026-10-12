@@ -1,0 +1,6 @@
+# GPU job 3/4: every surgical-phase downstream run (same hardware as the other downstream tasks).
+output_dir: experiments
+steps:
+  - {downstream: configs/downstream/phase_continuous.yaml}
+  - {downstream: configs/downstream/phase_vq.yaml}
+  - {downstream: configs/downstream/phase_segments.yaml}

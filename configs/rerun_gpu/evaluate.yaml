@@ -1,0 +1,11 @@
+# CPU job 4/4: re-evaluate the unchanged tokenizers (adds the protocol-overhead ratio) + text/point-cloud interfaces.
+output_dir: experiments
+steps:
+  - {interfaces: true}
+  - {evaluate: experiments/timeseries_continuous}
+  - {evaluate: experiments/timeseries_vq}
+  - {evaluate: experiments/timeseries_event}
+  - {evaluate: experiments/timeseries_event_change}
+  - {evaluate: experiments/video_continuous}
+  - {evaluate: experiments/video_vq}
+  - {evaluate: experiments/video_segments}

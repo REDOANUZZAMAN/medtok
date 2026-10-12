@@ -23,7 +23,7 @@ from .train import fit
 
 def run_downstream(cfg: dict) -> Run:
     run = Run(cfg, kind="downstream")
-    torch.set_num_threads(int(cfg.get("threads", os.cpu_count())))
+    torch.set_num_threads(int(cfg.get("threads", os.environ.get("MEDTOK_THREADS", os.cpu_count()))))
     max_len = cfg.get("max_len", 2048)
     data, tasks, cont_dims, info = {}, {}, {}, {}
     for entry in cfg["tasks"]:
