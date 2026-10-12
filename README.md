@@ -8,14 +8,14 @@ The project converts heterogeneous medical data into **one discrete token vocabu
 - **B. vector quantisation**;
 - **C. event-based tokens**.
 
-The comparison measures compression ratio, reconstruction error, codebook utilisation, sequence length and downstream task performance.
+The comparison measures compression ratio, reconstruction error, codebook utilisation, sequence length and downstream task performance (images: AUROC, macro-F1; ICU mortality: AUROC, AUPRC). Images and time-series are the two fully implemented modalities; the scope follows the six-week plan in `slides/WEEKLY_PLAN.md`.
 
 | Modality | Data | Status |
 |---|---|---|
 | 2D medical images | MedMNIST v2 (Blood / Pneumonia / Derma) | full: VQ + continuous tokenizers, 3 classification tasks |
 | Physiological time-series | PhysioNet 2012 (4,000 ICU stays) | full: event (2 variants) + VQ + continuous, mortality prediction |
-| Surgical video | Cataract-101 (101 surgeries, 10 phases) — open stand-in for request-only Cholec80 | full: VQ + continuous + unsupervised segment events, online phase recognition; annotation-event codec |
-| Clinical text | templated notes (no open clinical free text in scope) | interface: exact byte-level BPE codec, pluggable sub-word tokenizer |
+| Surgical video | Cataract-101 (101 surgeries, 10 phases) — open stand-in for request-only Cholec80; results not comparable with Cholec80 | adaptation: VQ + continuous + unsupervised segment events, online phase recognition; annotation-event codec (encodes ground-truth labels, not recognition) |
+| Clinical text | **synthetic** templated notes, versioned (no open clinical free text in scope) | protocol support: exact byte-level BPE codec, accepted on round-trip / field preservation only |
 | 3D point clouds | synthetic surfaces (SCARED is request-only) | interface: normalise → voxel groups → features → codebook |
 
 **Results** are generated from experiment outputs, never typed in:

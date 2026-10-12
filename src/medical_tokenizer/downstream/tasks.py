@@ -27,11 +27,11 @@ class DownstreamTask:
 TASKS = {
     "mortality": DownstreamTask("mortality", "death", "binary", 2, "auroc",
                                 description="PhysioNet 2012 in-hospital mortality from the first 48 h"),
-    "bloodmnist": DownstreamTask("bloodmnist", "class", "multiclass", 8, "acc",
+    "bloodmnist": DownstreamTask("bloodmnist", "class", "multiclass", 8, "auroc",
                                  description="BloodMNIST blood-cell type (8 classes)"),
     "pneumoniamnist": DownstreamTask("pneumoniamnist", "class", "binary", 2, "auroc",
                                      description="PneumoniaMNIST pneumonia vs normal"),
-    "dermamnist": DownstreamTask("dermamnist", "class", "multiclass", 7, "acc",
+    "dermamnist": DownstreamTask("dermamnist", "class", "multiclass", 7, "auroc",
                                  description="DermaMNIST skin-lesion type (7 classes)"),
     "surgical_phase": DownstreamTask("surgical_phase", "phase", "multiclass", 10, "macro_f1",
                                      description="Cataract-101 phase of the last frame of a window (online)"),
@@ -49,7 +49,9 @@ def metrics(task: DownstreamTask, y: np.ndarray, logits: np.ndarray) -> dict:
             out["auroc"] = float(roc_auc_score(y, p[:, 1]))
             out["auprc"] = float(average_precision_score(y, p[:, 1]))
     else:
-        present = np.unique(y)
-        if len(present) == task.n_classes:
-            out["auroc"] = float(roc_auc_score(y, p, multi_class="ovr", average="macro"))
+        # macro one-vs-rest AUROC; equals sklearn's multi_class="ovr" when every class is present and
+        # otherwise averages over the classes that occur (needed for model selection on small splits)
+        per = [roc_auc_score(y == c, p[:, c]) for c in np.unique(y)] if len(np.unique(y)) > 1 else []
+        if per:
+            out["auroc"] = float(np.mean(per))
     return out

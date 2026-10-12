@@ -45,7 +45,7 @@ Each box can be replaced independently. The only contracts are:
    - Every run gets a fresh directory with the resolved config, environment, git commit, logs, checkpoint, codebook and metrics.
    - Seeds are fixed and deterministic algorithms are enabled (warn-only).
    - `latest` symlinks point at the newest run, and nothing is overwritten.
-8. **CPU-first sizes.** Every model trains on a 6-core CPU in minutes to tens of minutes (image autoencoder ≈ 0.72 M parameters incl. a 512 × 32 codebook). No GPU is assumed.
+8. **CPU-first sizes.** Every model trains on a 6-core CPU in minutes to tens of minutes (image autoencoder ≈ 0.72 M parameters incl. a 1,024 × 32 codebook). No GPU is assumed.
 
 ## Command-line interface
 

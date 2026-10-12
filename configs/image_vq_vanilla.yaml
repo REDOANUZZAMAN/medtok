@@ -1,4 +1,4 @@
 # Codebook-collapse reference: classic VQ-VAE (codebook loss, Euclidean lookup, random init, no restarts)
 base: image_vq.yaml
 name: image_vq_vanilla
-quantizer: {type: vq, n_codes: 512, update: loss, beta: 0.25, normalize: false, restart_dead: false, init: random}
+quantizer: {type: vq, n_codes: 1024, update: loss, beta: 0.25, normalize: false, restart_dead: false, init: random}

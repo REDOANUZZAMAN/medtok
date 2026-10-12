@@ -20,7 +20,7 @@ from ..toolkit import build_lexicon
 from ..utils.config import arg_parser, load_config
 from . import datasets as D
 from . import medmnist, physionet
-from .notes import IMAGE_CONTEXT, VIDEO_CONTEXT, stay_note
+from .notes import IMAGE_CONTEXT, TEMPLATE_RULES, TEMPLATE_VERSION, VIDEO_CONTEXT, stay_note
 from .video import prepare_cataract101
 
 
@@ -74,6 +74,7 @@ def prepare(cfg: dict) -> dict:
         bpe = ClinicalTextTokenizer.train(corpus, vocab_size=cfg.get("text", {}).get("vocab_size", 1024))
         bpe.save(os.path.join(assets, "text_bpe.json"))
         stats["text_bpe"] = {"vocab_size": bpe.alphabet_size(), "train_notes": len(corpus)}
+        stats["text_templates"] = {"synthetic": True, "version": TEMPLATE_VERSION, "rules": TEMPLATE_RULES}
     with open(D.abspath("data/processed/data_stats.json"), "w") as f:
         json.dump(stats, f, indent=1)
     print(json.dumps(stats, indent=1)[:3000])

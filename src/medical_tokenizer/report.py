@@ -68,8 +68,10 @@ class Table:
 def tokenizer_tables(missing: list) -> list[Table]:
     tabs = []
     t = Table("Images (MedMNIST test sets): reconstruction, compression, utilisation",
-              ["experiment", "rep", "subset", "tokens", "PSNR dB", "SSIM", "MAE", "ratio (fixed)",
-               "ratio (entropy)", "active codes", "util", "perplexity"])
+              ["experiment", "rep", "subset", "positions", "vocab tokens", "cont. vectors", "PSNR dB", "SSIM", "MAE",
+               "ratio (fixed)", "ratio (+overhead)", "ratio (entropy)", "active codes", "util", "perplexity"],
+              "Continuous rows are the continuous baseline: their positions carry fp16 vectors and are NOT "
+              "vocabulary tokens. '+overhead' adds span delimiters and decoding metadata (docs/token_protocol.md §7).")
     for name in ("image_continuous", "image_vq", "image_vq_vanilla"):
         m = latest(name, "eval/metrics.json")
         if m is None:
@@ -79,15 +81,18 @@ def tokenizer_tables(missing: list) -> list[Table]:
             if sub not in m:
                 continue
             r, c, u = m[sub]["reconstruction"], m[sub]["compression"], m[sub].get("utilization", {})
-            t.add(name, m["representation"], sub, c["tokens_per_sample_mean"], r["psnr_db"], r["ssim"], r["mae"],
-                  c["compression_ratio"], c.get("entropy_coded_ratio"), u.get("active_codes"), u.get("utilization"),
-                  u.get("perplexity"))
+            t.add(name, m["representation"], sub, c["tokens_per_sample_mean"], c.get("discrete_tokens_per_sample"),
+                  c.get("continuous_vectors_per_sample"), r["psnr_db"], r["ssim"], r["mae"], c["compression_ratio"],
+                  c.get("compression_ratio_with_overhead"), c.get("entropy_coded_ratio"), u.get("active_codes"),
+                  u.get("utilization"), u.get("perplexity"))
     tabs.append(t)
     t = Table("Physiological time-series (PhysioNet 2012 test stays)",
-              ["experiment", "rep", "tokens mean", "tokens max", "MAE (z)", "RMSE (z)", "ratio (fixed)",
-               "ratio (entropy)", "seq. reduction vs obs", "active codes / bins", "util"],
+              ["experiment", "rep", "positions mean", "positions max", "cont. vectors", "MAE (z)", "RMSE (z)",
+               "ratio (fixed)", "ratio (+overhead)", "ratio (entropy)", "seq. reduction vs obs", "active codes / bins",
+               "util"],
               "Errors on observed cells of the hourly grid, per-variable z-units. Gridding error (raw -> hourly "
-              "grid, shared by all representations) is listed separately.")
+              "grid, shared by all representations) is listed separately. " + "Continuous rows are the continuous baseline: their positions carry fp16 vectors and are NOT "
+              "vocabulary tokens. '+overhead' adds span delimiters and decoding metadata (docs/token_protocol.md §7).")
     grid_err = None
     for name in ("timeseries_continuous", "timeseries_vq", "timeseries_event", "timeseries_event_change"):
         m = latest(name, "eval/metrics.json")
@@ -98,15 +103,20 @@ def tokenizer_tables(missing: list) -> list[Table]:
         u = m.get("utilization", {})
         u = u.get("value_bins", u)
         grid_err = m.get("gridding_mae_z", grid_err)
-        t.add(name, m["representation"], c["tokens_per_sample_mean"], c["tokens_per_sample_max"], r["mae_z"],
-              r["rmse_z"], c["compression_ratio"], c.get("entropy_coded_ratio"), c.get("sequence_reduction"),
+        t.add(name, m["representation"], c["tokens_per_sample_mean"], c["tokens_per_sample_max"],
+              c.get("continuous_vectors_per_sample"), r["mae_z"], r["rmse_z"], c["compression_ratio"],
+              c.get("compression_ratio_with_overhead"), c.get("entropy_coded_ratio"), c.get("sequence_reduction"),
               u.get("active_codes"), u.get("utilization"))
     if grid_err is not None:
         t.note += f" Gridding MAE (z) = {grid_err:.3f}."
     tabs.append(t)
     t = Table("Surgical video (Cataract-101 test videos)",
-              ["experiment", "rep", "tokens/min", "PSNR dB", "SSIM", "ratio (fixed)", "ratio (entropy)",
-               "active codes / states", "util"])
+              ["experiment", "rep", "positions/min", "PSNR dB", "SSIM", "ratio (fixed)", "ratio (+overhead)",
+               "ratio (entropy)", "active codes / states", "util"],
+              "Cataract-101 (10 phases, video-level split) replaces Cholec80; results are not comparable with "
+              "Cholec80 results. The annotated-phase-event row encodes ground-truth labels: it measures annotation "
+              "encoding, not phase recognition from raw video. " + "Continuous rows are the continuous baseline: their positions carry fp16 vectors and are NOT "
+              "vocabulary tokens. '+overhead' adds span delimiters and decoding metadata (docs/token_protocol.md §7).")
     for name in ("video_continuous", "video_vq", "video_segments"):
         m = latest(name, "eval/metrics.json")
         if m is None:
@@ -114,19 +124,21 @@ def tokenizer_tables(missing: list) -> list[Table]:
             continue
         r, c, u = m["reconstruction"], m["compression"], m.get("utilization", {})
         t.add(name, m["representation"], c["tokens_per_minute"], r["psnr_db"], r["ssim"], c["compression_ratio"],
-              c.get("entropy_coded_ratio"), u.get("active_codes"), u.get("utilization"))
+              c.get("compression_ratio_with_overhead"), c.get("entropy_coded_ratio"), u.get("active_codes"),
+              u.get("utilization"))
         if "annotated_phase_events" in m:
             a = m["annotated_phase_events"]
-            t.add("annotated phase events (reference, uses labels)", "event",
-                  a.get("tokens_per_minute"),
-                  None, None, a["compression_ratio"], a.get("entropy_coded_ratio"), None, None)
+            t.add("annotated phase events (ground-truth labels; annotation encoding only)", "event",
+                  a.get("tokens_per_minute"), None, None, a["compression_ratio"],
+                  a.get("compression_ratio_with_overhead"), a.get("entropy_coded_ratio"), None, None)
     tabs.append(t)
     return tabs
 
 
-DS = [("bloodmnist", ["ds_bloodmnist_continuous", "ds_bloodmnist_vq"], ["acc", "macro_f1", "auroc"]),
-      ("pneumoniamnist", ["ds_pneumoniamnist_continuous", "ds_pneumoniamnist_vq"], ["auroc", "acc", "macro_f1"]),
-      ("dermamnist", ["ds_dermamnist_continuous", "ds_dermamnist_vq"], ["acc", "macro_f1", "auroc"]),
+# headline metrics: AUROC + macro-F1 for images, AUROC + AUPRC for ICU mortality
+DS = [("bloodmnist", ["ds_bloodmnist_continuous", "ds_bloodmnist_vq"], ["auroc", "macro_f1", "acc"]),
+      ("pneumoniamnist", ["ds_pneumoniamnist_continuous", "ds_pneumoniamnist_vq"], ["auroc", "macro_f1", "acc"]),
+      ("dermamnist", ["ds_dermamnist_continuous", "ds_dermamnist_vq"], ["auroc", "macro_f1", "acc"]),
       ("mortality", ["ds_mortality_continuous", "ds_mortality_vq", "ds_mortality_event", "ds_mortality_event_change",
                      "ds_mortality_event_text"], ["auroc", "auprc", "balanced_acc"]),
       ("surgical_phase", ["ds_phase_continuous", "ds_phase_vq", "ds_phase_segments"], ["macro_f1", "acc", "balanced_acc"])]
@@ -134,7 +146,10 @@ DS = [("bloodmnist", ["ds_bloodmnist_continuous", "ds_bloodmnist_vq"], ["acc", "
 
 def downstream_table(missing: list) -> Table:
     t = Table("Downstream tasks (test set, mean ± std over seeds)",
-              ["task", "experiment", "seq len (train mean)", "metric 1", "metric 2", "metric 3", "seeds"])
+              ["task", "experiment", "seq len (train mean)", "metric 1", "metric 2", "metric 3", "seeds"],
+              "Fixed splits and an identical model / training budget per task. Images: AUROC and macro-F1; "
+              "ICU mortality: AUROC and AUPRC. Text in ds_mortality_event_text is synthetic (admission-time fields "
+              "only, no outcome). Surgical phase uses Cataract-101 and is not comparable with Cholec80 results.")
     for task, names, keys in DS + [("multitask", ["ds_multitask_vq"], None)]:
         for name in names:
             m = latest(name, "metrics.json")
@@ -150,7 +165,7 @@ def downstream_table(missing: list) -> Table:
     return t
 
 
-TASK_KEY = {"bloodmnist": "acc", "pneumoniamnist": "auroc", "dermamnist": "acc", "mortality": "auroc",
+TASK_KEY = {"bloodmnist": "auroc", "pneumoniamnist": "auroc", "dermamnist": "auroc", "mortality": "auroc",
             "surgical_phase": "macro_f1"}
 
 
@@ -218,16 +233,20 @@ def interface_table(missing: list) -> Table | None:
     if m is None:
         missing.append("interfaces")
         return None
-    t = Table("Interface modalities", ["modality", "setting", "exact round-trip / Chamfer", "tokens mean", "ratio"],
-              "Text: templated notes (not clinical free text). Point clouds: synthetic surfaces, non-learned "
-              "features; Chamfer relative to object extent.")
+    t = Table("Interface modalities",
+              ["modality", "setting", "exact round-trip / Chamfer", "field preservation", "tokens mean", "ratio",
+               "ratio (+overhead)"],
+              "Text: SYNTHETIC templated notes (not clinical free text); accepted on lossless round-trip, field "
+              "preservation and protocol compatibility only, no claim about clinical language understanding. "
+              "Point clouds: synthetic surfaces, non-learned features; Chamfer relative to object extent.")
     tx = m["text"]
-    t.add("text", f"BPE vocab {tx['vocab_size']}", tx["exact_roundtrip_rate"],
-          tx["compression"]["tokens_per_sample_mean"], tx["compression"]["compression_ratio"])
+    t.add("text", f"BPE vocab {tx['vocab_size']}, templates v{tx.get('template_version', 1)}",
+          tx["exact_roundtrip_rate"], tx.get("field_preservation_rate"), tx["compression"]["tokens_per_sample_mean"],
+          tx["compression"]["compression_ratio"], tx["compression"].get("compression_ratio_with_overhead"))
     for k, v in m["pointcloud_synthetic"].items():
         if isinstance(v, dict):
-            t.add("pointcloud", k, v["chamfer_rel_extent"], v["compression"]["tokens_per_sample_mean"],
-                  v["compression"]["compression_ratio"])
+            t.add("pointcloud", k, v["chamfer_rel_extent"], None, v["compression"]["tokens_per_sample_mean"],
+                  v["compression"]["compression_ratio"], v["compression"].get("compression_ratio_with_overhead"))
     return t
 
 
@@ -473,8 +492,9 @@ def token_sequence_figure(out, plt) -> list[str]:
     """Visualise one real multimodal token sequence: token type per position."""
     from .protocol.storage import load_shard
     from .protocol.tokens import token_type
+    from .data.notes import TEMPLATE_VERSION
     paths = sorted(glob.glob(os.path.join(abspath("experiments"), "timeseries_event", "latest", "tokens",
-                                          "mortality_text", "test.npz")))
+                                          f"mortality_text_v{TEMPLATE_VERSION}", "test.npz")))
     if not paths:
         return []
     seq = load_shard(paths[0])[0][0]

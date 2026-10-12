@@ -196,7 +196,9 @@ The static block of the time-series codecs is identical across the three represe
 - **Fixed-length token bits**: every discrete payload token costs `log2(alphabet)`, where `alphabet` is the number of ids the codec can emit. Continuous vectors cost 16 bits per value (fp16). `<CONT>` placeholders cost nothing.
 - **Entropy-coded bits**: discrete tokens at the empirical entropy of their id distribution over the evaluated split. This is a lower bound for any per-token prefix code.
 
-Span delimiters and `<DT>` tokens between spans are shared protocol overhead. They are counted in sequence length but not in payload bits.
+- **Fixed-length bits with protocol overhead** (`ratio (+overhead)`): fixed-length payload bits plus, per span, the three structural tokens `<MOD_START> <REP:*> <MOD_END>` at `⌈log2 13,824⌉ = 14` bits each and the span metadata the decoder needs (grid shape, fps, scale, ...) at its compact-JSON size × 8 bits. JSON makes this an upper bound.
+
+All ratios use the same raw input scale for every representation of a modality. Continuous `<CONT>` positions are Transformer positions carrying fp16 vectors; they are reported as continuous vectors and are never counted as vocabulary tokens. `<DT>` tokens between spans of a multimodal sample are counted in sequence length.
 
 ## 8. Adding a modality or dataset
 

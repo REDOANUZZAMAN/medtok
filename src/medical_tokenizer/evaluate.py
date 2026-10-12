@@ -51,7 +51,7 @@ def _span_accounting(codec, segs, spans, raw_elements, d_model=128):
     cont_vals = [0 if s.cont is None else s.cont.size for s in spans]
     n_tok = [len(s.ids) for s in spans]
     out = compression_summary([codec.raw_bits(g) for g in segs], [codec.payload_bits(s) for s in spans], n_tok,
-                              raw_elements, disc, cont_vals)
+                              raw_elements, disc, cont_vals, spans)
     out["transformer_input_kib_per_sample"] = transformer_input_bytes(np.mean(n_tok), d_model) / 1024
     out["continuous_values_per_sample"] = float(np.mean(cont_vals))
     return out
@@ -220,7 +220,7 @@ def eval_annotated_phase_events(d: dict, vids, files) -> dict:
     spans = [codec.encode(s) for s in segs]
     exact = exact_match_rate((codec.decode(sp)["phase"], s.data["phase"]) for sp, s in zip(spans, segs))
     out = compression_summary([codec.raw_bits(s) for s in segs], [codec.payload_bits(s) for s in spans],
-                              [len(s.ids) for s in spans], [len(s.data["phase"]) for s in segs])
+                              [len(s.ids) for s in spans], [len(s.data["phase"]) for s in segs], spans=spans)
     out["exact_roundtrip_rate"] = exact
     minutes = sum(len(s.data["phase"]) for s in segs) / d["fps"] / 60
     out["tokens_per_minute"] = float(sum(len(s.ids) for s in spans) / minutes)
@@ -230,7 +230,7 @@ def eval_annotated_phase_events(d: dict, vids, files) -> dict:
 # ------------------------------------------------------------------ interfaces (text, point cloud)
 def eval_interfaces(out_root: str | None = None) -> str:
     from .data.datasets import stays
-    from .data.notes import stay_note
+    from .data.notes import TEMPLATE_VERSION, note_fields, stay_note
     from .toolkit import load_text_tokenizer
     from .tokenizers.pointcloud.codec import PointCloudTokenizer, chamfer, synthetic_surface
     cfg = {"name": "interfaces", "seed": 0, "data": {"root": "data/raw/physionet2012"}}
@@ -239,13 +239,20 @@ def eval_interfaces(out_root: str | None = None) -> str:
     notes = [stay_note(s) for s in stays(cfg["data"]) if s.split == "test"]
     segs = [Segment("text", n) for n in notes]
     spans = [text.encode(s) for s in segs]
-    res = {"text": {"exact_roundtrip_rate": exact_match_rate((text.decode(sp), n) for sp, n in zip(spans, notes)),
+    decoded = [text.decode(sp) for sp in spans]
+    res = {"text": {"exact_roundtrip_rate": exact_match_rate(zip(decoded, notes)),
+                    "field_preservation_rate": float(np.mean([note_fields(a) == note_fields(b)
+                                                              for a, b in zip(decoded, notes)])),
+                    "fields_per_note": float(np.mean([len(note_fields(n)) for n in notes])),
                     "chars_per_token": float(np.mean([len(n) / len(sp.ids) for n, sp in zip(notes, spans)])),
                     "vocab_size": text.alphabet_size(),
                     "compression": compression_summary([text.raw_bits(s) for s in segs],
                                                        [text.payload_bits(s) for s in spans],
-                                                       [len(s.ids) for s in spans], [len(n) for n in notes]),
-                    "source": "templated notes rendered from structured admission fields (not clinical free text)"}}
+                                                       [len(s.ids) for s in spans], [len(n) for n in notes],
+                                                       spans=spans),
+                    "source": "SYNTHETIC templated notes rendered from structured admission fields (not clinical free text)",
+                    "template_version": TEMPLATE_VERSION,
+                    "acceptance": "lossless round-trip, field preservation, protocol compatibility only"}}
     train_c = [synthetic_surface(2048, seed=i) for i in range(40)]
     test_c = [synthetic_surface(2048, seed=1000 + i) for i in range(20)]
     pc = {}
@@ -258,7 +265,8 @@ def eval_interfaces(out_root: str | None = None) -> str:
         pc[f"res{res_}"] = {"chamfer_mm": float(np.mean(cd)), "chamfer_rel_extent": float(np.mean(cd) / extent),
                             "compression": compression_summary([tok.raw_bits(s) for s in segs],
                                                                [tok.payload_bits(s) for s in sp],
-                                                               [len(s.ids) for s in sp], [len(c) for c in test_c])}
+                                                               [len(s.ids) for s in sp], [len(c) for c in test_c],
+                                                               spans=sp)}
     res["pointcloud_synthetic"] = pc | {"note": "synthetic surfaces only; interface-level, no learned encoder"}
     run.save_metrics(res)
     print("interfaces:", run.dir)

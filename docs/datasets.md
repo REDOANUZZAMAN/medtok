@@ -47,7 +47,9 @@ The image tokenizer is trained on the union of the three training splits (23,674
       http://ftp.itec.aau.at/datasets/ovid/cat-101/downloads/cataract-101.zip     # 9.0 GB
   ```
 - `prepare` samples every video at **2 fps**, centre-crops it to 540 × 540 and resizes it to **64 × 64** into `data/processed/cataract101_2fps_64/<video>.npz`. Experiments subsample this cache to 1 fps or 0.5 fps.
-- Split: video-level (= patient-level), seed 0, 70 / 15 / 15 %.
+- Split: video-level (= patient-level), seed 0, 70 / 15 / 15 %. Whole surgeries are assigned to one split, so adjacent frames never cross train / val / test. Codebooks, the k-means segment states and any other learned preprocessing are fitted on the training videos only.
+- Fixed and reported settings: frame sampling 1 fps for the tokenizers and downstream task (2 fps cache; 0.5 / 2 fps only in the sampling-rate ablation), clip length 8 frames = 8 s, no clip overlap, downstream window 4 clips = 32 s with stride 1 clip, frames 64 × 64. Event times are in seconds from the start of the video in the cache and in minutes in the protocol `t` field.
+- Phase vocabulary (`CATARACT101_PHASES`, 10 classes, used as-is with no merging or remapping): the dataset's 10 phase ids map one-to-one to `<EV:cataract101:phase:…>` tokens; unannotated frames before the first annotation map to label −1 / `<EV:cataract101:phase:none>`.
 
 | Split | videos | frames @ 2 fps | unannotated |
 |---|---|---|---|
@@ -57,17 +59,22 @@ The image tokenizer is trained on the union of the three training splits (23,674
 
 The phases are imbalanced. Phacoemulsification (phase 5) covers 31 % of annotated training frames, and capsule polishing (phase 7) 4 %. This is why phase recognition is selected and reported on macro-F1.
 
-**Why Cataract-101 instead of Cholec80:** Cholec80's public archive now returns HTTP 403, so it needs a CAMMA data request. Cataract-101 is the closest openly available surgical-video dataset with expert phase annotations. `data/video.py` includes Cholec80 parsers (`cholec80_phases`, `cholec80_tools`), and the same frame sampler and codecs apply unchanged once a local copy exists.
+**Why Cataract-101 instead of Cholec80 (approved by the supervisor):** Cholec80's public archive now returns HTTP 403, so it needs a CAMMA data request. Cataract-101 is the closest openly available surgical-video dataset with expert phase annotations. `data/video.py` includes Cholec80 parsers (`cholec80_phases`, `cholec80_tools`), and the same frame sampler and codecs apply unchanged once a local copy exists.
 
-### Text — templated notes (interface modality)
+This is a change of **surgical domain and label set**: cataract surgery (ophthalmology, operating microscope, 10 phases, ~8 min per case) instead of laparoscopic cholecystectomy (7 phases + 7 tools, ~38 min per case). Consequences:
 
-No open dataset in scope contains clinical free text; MIMIC notes are credentialed-access. `data/notes.py` renders short notes from structured fields:
+- Results on Cataract-101 are **not comparable** with published Cholec80 results and are never presented as such.
+- Event tokens generated from the ground-truth phase labels (`AnnotatedPhaseEventCodec`) demonstrate **annotation encoding** only (lossless phase-label → token → phase-label round-trip). They are not evidence of automatic phase recognition from raw video; the phase-recognition task uses video tokens only.
 
-- ICU admission notes use admission-time fields only, so no outcome leakage;
-- image-request notes give modality only, never the diagnosis;
-- video notes give the procedure type only.
+### Text — synthetic templated notes (interface modality)
 
-They exercise the text tokenizer and the multimodal layout. **No conclusion about clinical language is drawn from them.**
+No open dataset in scope contains clinical free text; MIMIC notes are credentialed-access. `data/notes.py` renders short notes from structured fields. **All of this text is synthetic.**
+
+- Every text segment carries the source tag `synthetic-template:<kind>@v<version>` (current version 2). The generation rules and the fields each kind reads (`TEMPLATE_RULES`) are written to `data/processed/data_stats.json` and to the interfaces run.
+- Coverage: several wording variants per sentence, units (cm, kg, bpm, mmHg, °C), missing values ("not recorded"), negation ("Not mechanically ventilated in the first hour", "GCS not assessed", "No vital signs recorded"), and times relative to admission ("at 00:12 after admission").
+- No label leakage: ICU admission notes read minutes 0–59 only and never the outcome; image-request notes give modality / body site only, never the class; video notes give the procedure type only, never the phases. Text is therefore never derived from the label it is used to predict.
+- No fake pairing: samples are built within one dataset. Records from different datasets are never concatenated and presented as patient-matched multimodal data.
+- Acceptance is limited to lossless round-trip, field preservation and protocol compatibility (see `docs/experiments.md`). **No conclusion about clinical language, image-text alignment or clinical generalisation is drawn from them.** A real alignment claim would need authorised, genuinely paired reports.
 
 ## Not used, interfaces only
 

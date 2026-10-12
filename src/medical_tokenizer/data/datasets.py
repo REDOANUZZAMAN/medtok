@@ -14,7 +14,7 @@ import numpy as np
 from ..protocol.schema import Sample, Segment
 from ..utils.experiment import REPO_ROOT
 from . import medmnist, physionet
-from .notes import image_note, stay_note, video_note
+from .notes import image_note, stay_note, template_source, video_note
 from .video import load_cache, video_splits
 
 
@@ -48,7 +48,7 @@ def image_samples(d: dict, split: str, subset: str, include_text: bool = False) 
     for i in range(len(x)):
         segs = [Segment("image", x[i], 0.0, subset)]
         if include_text:
-            segs.insert(0, Segment("text", image_note(subset, int(idx[i])), 0.0, "template:request"))
+            segs.insert(0, Segment("text", image_note(subset, int(idx[i])), 0.0, template_source("request")))
         out.append(Sample(f"{subset}/{split}/{idx[i]}", segs, {"class": int(y[i])}, split, {"task": subset}))
     return out
 
@@ -76,7 +76,7 @@ def icu_samples(d: dict, split: str, include_text: bool = False) -> list[Sample]
             continue
         segs = [stay_segment(s)]
         if include_text:
-            segs.insert(0, Segment("text", stay_note(s), 0.0, "template:admission"))
+            segs.insert(0, Segment("text", stay_note(s), 0.0, template_source("admission")))
         out.append(Sample(f"physionet2012/{s.record_id}", segs, {"death": int(s.death)}, split, {"task": "mortality"}))
     return out
 

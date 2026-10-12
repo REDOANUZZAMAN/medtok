@@ -5,23 +5,24 @@ output_dir: experiments
 evaluate_after: true      # every trained ablation is evaluated on its test split
 steps:
   # ---- image codebook size K (conv, patch 4, dim 32, 5 epochs)
+  # The main image_vq uses K=1024; the dim / patch / remedy ablations stay at K=512 (pinned below).
   - {train: configs/image_vq.yaml, name: abl_image_k64, set: [train.epochs=5, quantizer.n_codes=64], tags: [abl_image]}
   - {train: configs/image_vq.yaml, name: abl_image_k128, set: [train.epochs=5, quantizer.n_codes=128], tags: [abl_image]}
   - {train: configs/image_vq.yaml, name: abl_image_k256, set: [train.epochs=5, quantizer.n_codes=256], tags: [abl_image]}
-  - {train: configs/image_vq.yaml, name: abl_image_k512, set: [train.epochs=5], tags: [abl_image]}
+  - {train: configs/image_vq.yaml, name: abl_image_k512, set: [train.epochs=5, quantizer.n_codes=512], tags: [abl_image]}
   - {train: configs/image_vq.yaml, name: abl_image_k1024, set: [train.epochs=5, quantizer.n_codes=1024], tags: [abl_image]}
   # ---- image token dimension
-  - {train: configs/image_vq.yaml, name: abl_image_dim8, set: [train.epochs=5, model.dim=8], tags: [abl_image]}
-  - {train: configs/image_vq.yaml, name: abl_image_dim64, set: [train.epochs=5, model.dim=64], tags: [abl_image]}
+  - {train: configs/image_vq.yaml, name: abl_image_dim8, set: [train.epochs=5, quantizer.n_codes=512, model.dim=8], tags: [abl_image]}
+  - {train: configs/image_vq.yaml, name: abl_image_dim64, set: [train.epochs=5, quantizer.n_codes=512, model.dim=64], tags: [abl_image]}
   # ---- image patch size (one architecture for all: ViT-style patch embedding)
-  - {train: configs/image_vq.yaml, name: abl_image_patch2, set: [train.epochs=5, model.arch=patch, model.patch_size=2], tags: [abl_image]}
-  - {train: configs/image_vq.yaml, name: abl_image_patch4, set: [train.epochs=5, model.arch=patch, model.patch_size=4], tags: [abl_image]}
-  - {train: configs/image_vq.yaml, name: abl_image_patch7, set: [train.epochs=5, model.arch=patch, model.patch_size=7], tags: [abl_image]}
+  - {train: configs/image_vq.yaml, name: abl_image_patch2, set: [train.epochs=5, quantizer.n_codes=512, model.arch=patch, model.patch_size=2], tags: [abl_image]}
+  - {train: configs/image_vq.yaml, name: abl_image_patch4, set: [train.epochs=5, quantizer.n_codes=512, model.arch=patch, model.patch_size=4], tags: [abl_image]}
+  - {train: configs/image_vq.yaml, name: abl_image_patch7, set: [train.epochs=5, quantizer.n_codes=512, model.arch=patch, model.patch_size=7], tags: [abl_image]}
   # ---- codebook-collapse remedies, switched off one at a time (K=512, 5 epochs)
-  - {train: configs/image_vq.yaml, name: abl_image_norestart, set: [train.epochs=5, quantizer.restart_dead=false], tags: [abl_image]}
-  - {train: configs/image_vq.yaml, name: abl_image_nocosine, set: [train.epochs=5, quantizer.normalize=false], tags: [abl_image]}
-  - {train: configs/image_vq.yaml, name: abl_image_lossupdate, set: [train.epochs=5, quantizer.update=loss], tags: [abl_image]}
-  - {train: configs/image_vq_vanilla.yaml, name: abl_image_vanilla, set: [train.epochs=5], tags: [abl_image]}
+  - {train: configs/image_vq.yaml, name: abl_image_norestart, set: [train.epochs=5, quantizer.n_codes=512, quantizer.restart_dead=false], tags: [abl_image]}
+  - {train: configs/image_vq.yaml, name: abl_image_nocosine, set: [train.epochs=5, quantizer.n_codes=512, quantizer.normalize=false], tags: [abl_image]}
+  - {train: configs/image_vq.yaml, name: abl_image_lossupdate, set: [train.epochs=5, quantizer.n_codes=512, quantizer.update=loss], tags: [abl_image]}
+  - {train: configs/image_vq_vanilla.yaml, name: abl_image_vanilla, set: [train.epochs=5, quantizer.n_codes=512], tags: [abl_image]}
   # ---- time-series codebook size
   - {train: configs/timeseries_vq.yaml, name: abl_ts_k64, set: [quantizer.n_codes=64], tags: [abl_ts]}
   - {train: configs/timeseries_vq.yaml, name: abl_ts_k128, set: [quantizer.n_codes=128], tags: [abl_ts]}

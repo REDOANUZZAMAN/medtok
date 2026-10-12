@@ -2,7 +2,7 @@
 
     python -m medical_tokenizer.encode --run experiments/image_vq/latest --task bloodmnist [--include-text]
 
-Shards: <run>/tokens/<task>[_text][_<override-hash>]/{train,val,test}.npz (protocol/storage.py).
+Shards: <run>/tokens/<task>[_text_v<template version>][_<override-hash>]/{train,val,test}.npz (protocol/storage.py).
 Tasks: bloodmnist | pneumoniamnist | dermamnist (image), mortality (timeseries), surgical_phase (video).
 """
 from __future__ import annotations
@@ -17,6 +17,7 @@ import numpy as np
 
 from .codecs.base import MultimodalCodec
 from .data import datasets as D
+from .data.notes import TEMPLATE_VERSION, template_source
 from .protocol.schema import Sample, Segment, TokenSequence
 from .protocol.serialize import serialize_spans, validate
 from .protocol.storage import load_shard, save_shard
@@ -29,7 +30,7 @@ SPLITS = ("train", "val", "test")
 
 
 def shard_dir(run_dir: str, task: str, include_text: bool, overrides: dict | None) -> str:
-    key = task + ("_text" if include_text else "")
+    key = task + (f"_text_v{TEMPLATE_VERSION}" if include_text else "")    # new templates -> new shards
     if overrides:
         key += "_" + hashlib.sha1(json.dumps(overrides, sort_keys=True).encode()).hexdigest()[:6]
     return os.path.join(run_dir, "tokens", key)
@@ -96,7 +97,7 @@ def _encode_video_split(d: dict, split: str, codec, text_codec) -> list[TokenSeq
             segs = [Segment("video", {"clips": [c, c + W], "fps": fps}, 0.0, "cataract101")]
             spans = [make(per_clip[c:c + W])]
             if text_codec is not None:
-                segs.insert(0, Segment("text", D.video_text_note(v), 0.0, "template:procedure"))
+                segs.insert(0, Segment("text", D.video_text_note(v), 0.0, template_source("procedure")))
                 spans.insert(0, text_codec.encode(segs[0]))
             sample = Sample(f"cataract101/{v}/{c}", segs, {"phase": lab, "video": v}, split)
             seqs.append(serialize_spans(sample, spans))

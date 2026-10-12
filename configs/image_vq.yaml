@@ -18,7 +18,7 @@ model:
   n_res: 2
 quantizer:
   type: vq
-  n_codes: 512
+  n_codes: 1024       # 1,024-entry codebook (week-2 milestone); K=64..1024 in configs/ablations.yaml
   update: ema
   beta: 0.25
   decay: 0.99
