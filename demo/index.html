@@ -4,77 +4,171 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="data:,">
-<title>MedTok demo — one token language for medical data</title>
+<title>MedTok — Medical Multimodal Tokenizer</title>
 <style>
-  :root { --ink:#1d2433; --ink2:#5b6475; --line:#e3e6ec; --bg:#f7f8fa; --card:#fff; --accent:#2f6fde;
-          --ok:#1f8a4c; --warn:#b4541a; }
+  :root { --ink:#0f172a; --ink2:#64748b; --ink3:#94a3b8; --line:#e2e8f0; --bg:#f5f7fa; --card:#fff;
+          --accent:#0f766e; --accent2:#115e59; --accent-soft:#e6f4f2; --side:#0b1324; --side2:#1e293b;
+          --ok:#15803d; --warn:#c2410c; --radius:12px; --shadow:0 1px 2px rgba(15,23,42,.05),0 1px 3px rgba(15,23,42,.06); }
   * { box-sizing:border-box; }
-  body { margin:0; font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; color:var(--ink); background:var(--bg); }
-  header { background:var(--card); border-bottom:1px solid var(--line); padding:14px 24px; display:flex; gap:24px;
-           align-items:center; flex-wrap:wrap; }
-  header h1 { font-size:18px; margin:0; }
-  header .sub { color:var(--ink2); font-size:13px; }
-  nav { display:flex; gap:4px; flex-wrap:wrap; }
-  nav button { border:0; background:none; padding:8px 12px; border-radius:6px; cursor:pointer; font:inherit; color:var(--ink2); }
-  nav button.on { background:#e8effc; color:var(--accent); font-weight:600; }
-  main { max-width:1180px; margin:0 auto; padding:20px 24px 60px; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:18px 20px; margin-bottom:16px; }
-  .explain { background:#f1f5fd; border-left:4px solid var(--accent); padding:12px 16px; border-radius:6px; margin-bottom:16px; }
-  .explain b { color:var(--accent); }
+  html, body { height:100%; }
+  body { margin:0; font:14.5px/1.6 "Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; color:var(--ink); background:var(--bg);
+         -webkit-font-smoothing:antialiased; font-feature-settings:"tnum" 1; }
+  code { font:12.5px ui-monospace,SFMono-Regular,Menlo,monospace; background:#f1f5f9; padding:1px 5px; border-radius:4px; color:#334155; }
+  h2, h3 { letter-spacing:-.01em; color:var(--ink); }
+  h3 { font-size:15.5px; font-weight:650; }
+
+  /* ---- layout: sidebar + content ---- */
+  .app { display:grid; grid-template-columns:256px minmax(0,1fr); min-height:100vh; background:linear-gradient(to right,var(--side) 256px,var(--bg) 256px); }
+  aside { background:var(--side); color:#cbd5e1; position:sticky; top:0; height:100vh; display:flex; flex-direction:column; padding:22px 14px; }
+  .brand { display:flex; gap:11px; align-items:center; padding:0 10px 22px; border-bottom:1px solid var(--side2); margin-bottom:14px; }
+  .logo { width:36px; height:36px; border-radius:9px; background:linear-gradient(135deg,#14b8a6,#0f766e); display:grid; place-items:center;
+          color:#fff; font-weight:700; font-size:14px; letter-spacing:.02em; flex:none; }
+  .brand b { display:block; color:#fff; font-size:16px; line-height:1.2; }
+  .brand span { font-size:12px; color:var(--ink3); }
+  nav { display:flex; flex-direction:column; gap:2px; flex:1; overflow:auto; }
+  nav .grp { font-size:10.5px; text-transform:uppercase; letter-spacing:.09em; color:#64748b; padding:14px 12px 6px; font-weight:600; }
+  nav button { display:flex; align-items:center; gap:11px; border:0; background:none; padding:9px 12px; border-radius:8px; cursor:pointer;
+               font:inherit; font-size:14px; color:#cbd5e1; text-align:left; transition:background .15s,color .15s; }
+  nav button svg { width:18px; height:18px; flex:none; opacity:.8; }
+  nav button:hover { background:var(--side2); color:#fff; }
+  nav button.on { background:rgba(20,184,166,.14); color:#5eead4; font-weight:600; }
+  nav button.on svg { opacity:1; }
+  .side-foot { border-top:1px solid var(--side2); padding:14px 10px 0; font-size:11.5px; color:#64748b; line-height:1.5; }
+  .side-foot b { color:#94a3b8; font-weight:600; }
+
+  .content { min-width:0; }
+  .topbar { background:rgba(255,255,255,.85); backdrop-filter:blur(8px); border-bottom:1px solid var(--line); position:sticky; top:0; z-index:5;
+            padding:16px 36px; display:flex; align-items:center; justify-content:space-between; gap:16px; }
+  .topbar .crumb { font-size:12px; color:var(--ink3); text-transform:uppercase; letter-spacing:.08em; font-weight:600; }
+  .topbar h1 { font-size:20px; margin:2px 0 0; font-weight:700; letter-spacing:-.015em; }
+  .badge { display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:600; color:var(--accent2); background:var(--accent-soft);
+           border:1px solid #c7e7e2; padding:5px 11px; border-radius:999px; white-space:nowrap; }
+  .badge::before { content:""; width:7px; height:7px; border-radius:50%; background:#14b8a6; }
+  main { max-width:1240px; padding:28px 36px 64px; }
+
+  /* ---- components ---- */
+  .card { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:22px 24px; margin-bottom:18px; box-shadow:var(--shadow); }
+  .card > h3:first-child { margin:0 0 14px !important; padding-bottom:12px; border-bottom:1px solid #f1f5f9; }
+  .explain { position:relative; background:#fff; border:1px solid var(--line); border-left:4px solid var(--accent); padding:14px 18px 14px 50px;
+             border-radius:10px; margin-bottom:18px; color:#334155; box-shadow:var(--shadow); }
+  .explain::before { content:"i"; position:absolute; left:16px; top:15px; width:20px; height:20px; border-radius:50%; background:var(--accent);
+                     color:#fff; font:700 12px/20px Georgia,serif; text-align:center; }
+  .explain b { color:var(--accent2); }
   .row { display:flex; gap:20px; flex-wrap:wrap; align-items:flex-start; }
   .col { flex:1; min-width:220px; }
-  .flow { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
-  .arrow { font-size:28px; color:var(--ink2); }
+  .flow { display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+  .arrow { font-size:22px; color:var(--ink3); }
   figure { margin:0; text-align:center; }
-  figure img { border-radius:6px; border:1px solid var(--line); image-rendering:pixelated; }
-  figcaption { font-size:13px; color:var(--ink2); margin-top:4px; }
-  .controls { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px; }
-  select, button.act { font:inherit; padding:6px 12px; border-radius:6px; border:1px solid var(--line); background:#fff; cursor:pointer; }
-  button.act.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
-  table { border-collapse:collapse; font-size:13px; }
-  th, td { border-bottom:1px solid var(--line); padding:5px 10px; text-align:right; }
+  figure img { border-radius:8px; border:1px solid var(--line); image-rendering:pixelated; }
+  figcaption { font-size:12.5px; color:var(--ink2); margin-top:6px; line-height:1.45; }
+  .controls { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:18px; background:#fff; border:1px solid var(--line);
+              border-radius:10px; padding:10px 12px; box-shadow:var(--shadow); }
+  select, button.act { font:inherit; font-size:13.5px; padding:7px 14px; border-radius:8px; border:1px solid #cbd5e1; background:#fff; cursor:pointer;
+                       color:var(--ink); transition:all .15s; height:36px; }
+  select:hover, button.act:hover, label.act:hover { border-color:var(--accent); }
+  button.act.primary { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+  button.act.primary:hover { background:var(--accent2); }
+  label.act { display:inline-flex; align-items:center; height:36px; font-size:13.5px; }
+  table { border-collapse:collapse; font-size:13px; width:auto; }
+  th, td { border-bottom:1px solid #eef2f6; padding:8px 12px; text-align:right; white-space:nowrap; }
   th:first-child, td:first-child { text-align:left; }
-  th { color:var(--ink2); font-weight:600; }
+  th { color:var(--ink2); font-weight:600; font-size:11.5px; text-transform:uppercase; letter-spacing:.04em; background:#f8fafc; border-bottom:1px solid var(--line); }
+  tr:hover td { background:#fafcfd; }
   .grid7 { display:grid; gap:2px; font:11px ui-monospace,monospace; }
   .grid7 div { padding:4px 0; text-align:center; border-radius:3px; color:#fff; }
-  .toks { display:flex; flex-wrap:wrap; gap:3px; font:12px ui-monospace,monospace; max-height:340px; overflow:auto; }
-  .tok { padding:2px 5px; border-radius:4px; white-space:pre; }
+  .toks { display:flex; flex-wrap:wrap; gap:3px; font:12px ui-monospace,monospace; max-height:340px; overflow:auto; padding:2px; }
+  .tok { padding:2px 6px; border-radius:4px; white-space:pre; }
   .t-sequence_boundary, .t-special { background:#e4e7ee; color:#333; }
-  .t-modality_start, .t-modality_end { background:#1d2433; color:#fff; }
-  .t-representation { background:#5b6475; color:#fff; } .t-layout { background:#eceff3; color:#5b6475; }
+  .t-modality_start, .t-modality_end { background:#0f172a; color:#fff; }
+  .t-representation { background:#475569; color:#fff; } .t-layout { background:#eceff3; color:#5b6475; }
   .t-code { background:#dbe8ff; color:#174ea6; } .t-continuous { background:#d7f0ff; color:#05668d; }
   .t-variable { background:#e9e2fb; color:#4b2a9c; } .t-value_bin { background:#f3e8ff; color:#6b2fb3; }
   .t-time_delta { background:#fff4cc; color:#7a5b00; } .t-event { background:#ffe0e6; color:#a3123a; }
   .t-segment { background:#e0f2f1; color:#00695c; } .t-subword { background:#e3f6e8; color:#17663a; }
-  .legend span { margin-right:8px; }
+  .legend span { margin-right:12px; }
   .big { font-size:26px; font-weight:700; }
   .muted { color:var(--ink2); font-size:13px; }
   .ok { color:var(--ok); font-weight:600; } .bad { color:var(--warn); font-weight:600; }
-  .frames { display:flex; gap:4px; flex-wrap:wrap; }
-  .frames img { width:96px; height:96px; }
-  .timeline { position:relative; height:26px; border-radius:6px; overflow:hidden; display:flex; margin:8px 0 4px; }
+  .frames { display:flex; gap:5px; flex-wrap:wrap; }
+  .frames img { width:96px; height:96px; border-radius:6px; }
+  .timeline { position:relative; height:28px; border-radius:7px; overflow:hidden; display:flex; margin:8px 0 4px; }
   .timeline div { height:100%; }
-  .marker { position:absolute; top:-4px; width:3px; height:34px; background:#111; }
-  pre { background:#f6f7f9; border:1px solid var(--line); border-radius:6px; padding:10px; overflow:auto; font-size:12px; }
+  .marker { position:absolute; top:-4px; width:3px; height:36px; background:#0f172a; border-radius:2px; }
+  pre { background:#0f172a; color:#e2e8f0; border-radius:8px; padding:14px 16px; overflow:auto; font-size:12px; line-height:1.55; }
+  details summary { cursor:pointer; color:var(--accent2); font-weight:600; font-size:13.5px; margin-top:6px; }
   .stat { display:inline-block; margin-right:22px; }
   .stat .big { display:block; }
-  .md table { margin:8px 0 18px; } .md h3 { margin:22px 0 6px; font-size:15px; } .md p { color:var(--ink2); font-size:13px; }
-  .err { color:var(--warn); }
-  .charts { display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:14px 22px; }
+  .md { overflow:auto; } .md table { margin:10px 0 22px; } .md h3 { margin:26px 0 6px; font-size:15.5px; } .md h3:first-child { margin-top:0; }
+  .md p { color:var(--ink2); font-size:13px; max-width:980px; }
+  .err { color:var(--warn); border-color:#fed7aa; background:#fff7ed; }
+  .charts { display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:16px 24px; }
+  .chart { border:1px solid #f1f5f9; border-radius:8px; padding:10px 12px; }
   .chart svg { width:100%; height:auto; display:block; }
+  .loading { display:flex; align-items:center; gap:12px; }
+  .loading::before { content:""; width:18px; height:18px; border:2.5px solid #cbd5e1; border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  /* ---- overview page ---- */
+  .hero { background:linear-gradient(135deg,#0b1324 0%,#123b3a 100%); color:#e2e8f0; border-radius:16px; padding:34px 36px; margin-bottom:22px; position:relative; overflow:hidden; }
+  .hero::after { content:""; position:absolute; right:-80px; top:-80px; width:320px; height:320px; border-radius:50%; background:radial-gradient(circle,rgba(20,184,166,.35),transparent 70%); }
+  .hero .eyebrow { font-size:12px; text-transform:uppercase; letter-spacing:.12em; color:#5eead4; font-weight:600; }
+  .hero h2 { color:#fff; font-size:28px; line-height:1.25; margin:8px 0 10px; max-width:760px; }
+  .hero p { margin:0; max-width:760px; color:#cbd5e1; font-size:15px; }
+  .hero .cta { margin-top:20px; display:flex; gap:10px; flex-wrap:wrap; position:relative; z-index:1; }
+  .hero .cta button { height:38px; padding:0 18px; border-radius:8px; font:inherit; font-weight:600; cursor:pointer; border:1px solid rgba(255,255,255,.25); background:transparent; color:#fff; }
+  .hero .cta button.primary { background:#14b8a6; border-color:#14b8a6; color:#04201d; }
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:14px; margin-bottom:22px; }
+  .kpi { background:#fff; border:1px solid var(--line); border-radius:var(--radius); padding:16px 18px; box-shadow:var(--shadow); }
+  .kpi .v { font-size:26px; font-weight:700; letter-spacing:-.02em; color:var(--ink); }
+  .kpi .l { font-size:12.5px; color:var(--ink2); }
+  .pipe { display:grid; grid-template-columns:repeat(4,1fr); gap:0; align-items:stretch; }
+  .pipe .step { position:relative; padding:16px 18px; border:1px solid var(--line); border-radius:10px; background:#f8fafc; margin-right:26px; }
+  .pipe .step:not(:last-child)::after { content:"→"; position:absolute; right:-22px; top:50%; transform:translateY(-50%); color:var(--ink3); font-size:18px; }
+  .pipe .step:last-child { margin-right:0; }
+  .pipe .n { font-size:11px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:.08em; }
+  .pipe b { display:block; margin:2px 0 4px; }
+  .pipe .d { font-size:12.5px; color:var(--ink2); }
+  .tri { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+  .tri .item { border:1px solid var(--line); border-radius:10px; padding:16px 18px; }
+  .tri .tag { display:table; font-size:11px; font-weight:700; padding:2px 8px; border-radius:5px; margin-bottom:8px; }
+  .tri p { margin:4px 0 0; font-size:13px; color:var(--ink2); }
+
+  @media (max-width: 960px) {
+    .app { grid-template-columns:minmax(0,1fr); background:var(--bg); }
+    aside { min-width:0; }
+    .card { overflow-x:auto; }
+    aside { position:static; height:auto; padding:14px; }
+    .brand { border:0; padding-bottom:8px; margin:0; }
+    nav { flex-direction:row; overflow-x:auto; } nav .grp, .side-foot { display:none; }
+    nav button { white-space:nowrap; }
+    .topbar, main { padding-left:18px; padding-right:18px; }
+    .pipe, .tri { grid-template-columns:1fr; } .pipe .step { margin:0 0 10px; } .pipe .step::after { display:none; }
+  }
 </style>
 </head>
 <body>
-<header>
-  <div><h1>MedTok demo</h1><div class="sub">One token language for different medical data</div></div>
-  <nav id="nav"></nav>
-</header>
-<main id="main"></main>
+<div class="app">
+  <aside>
+    <div class="brand"><div class="logo">MT</div><div><b>MedTok</b><span>Medical multimodal tokenizer</span></div></div>
+    <nav id="nav"></nav>
+    <div class="side-foot"><b>Design of a Medical Multimodal-Specific Tokenizer and a Unified Data Protocol</b><br>Undergraduate thesis · protocol v0.2</div>
+  </aside>
+  <div class="content">
+    <div class="topbar"><div><div class="crumb" id="crumb">Overview</div><h1 id="ptitle">MedTok</h1></div><span class="badge">Test-set data only</span></div>
+    <main id="main"></main>
+  </div>
+</div>
 
 <script>
+const I = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const TABS = [
-  ["start", "Start here"], ["image", "1. Images"], ["icu", "2. ICU charts"], ["video", "3. Surgery video"],
-  ["text", "4. Text"], ["seq", "5. One shared sequence"], ["results", "6. Results"]];
+  ["start", "Overview", "Overview", I('<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/>'), "Start"],
+  ["image", "Images", "Medical images · MedMNIST", I('<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/>'), "Modalities"],
+  ["icu", "ICU time-series", "ICU charts · PhysioNet 2012", I('<path d="M3 12h4l3-8 4 16 3-8h4"/>'), "Modalities"],
+  ["video", "Surgical video", "Surgical video · Cataract-101", I('<rect x="2" y="6" width="14" height="12" rx="2"/><path d="M22 8l-6 4 6 4z"/>'), "Modalities"],
+  ["text", "Clinical text", "Clinical text · synthetic notes", I('<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h6"/>'), "Modalities"],
+  ["seq", "Shared sequence", "Unified token sequence · JSONL", I('<path d="M4 6h16M4 12h10M4 18h13"/>'), "Protocol"],
+  ["results", "Results", "Evaluation results", I('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'), "Evaluation"]];
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
 const f = (x, d=2) => x == null ? "–" : (Math.abs(x) >= 1000 ? Math.round(x).toLocaleString() : Number(x).toFixed(d));
@@ -86,41 +180,53 @@ const piece = (s) => String(s).replace(/\u0120/g, "·");   // BPE marks a leadin
 function tokSpans(toks) {
   return toks.map(t => `<span class="tok t-${t.type}" title="${esc(t.type)}">${esc(piece(t.s))}</span>`).join("");
 }
-function loading(msg="Working…") { $("#main").innerHTML = `<div class="card muted">${msg}</div>`; }
+function loading(msg="Loading…") { $("#main").innerHTML = `<div class="card muted loading">${msg}</div>`; }
 function fail(e) { $("#main").insertAdjacentHTML("afterbegin", `<div class="card err">Error: ${esc(e.message)}</div>`); }
 let INFO = null;
 
 // ---------------------------------------------------------------- start
 function start() {
+  const nImg = Object.values(INFO.image_counts).reduce((x, y) => x + y, 0);
   $("#main").innerHTML = `
-  <div class="card">
-    <h2 style="margin-top:0">What is this?</h2>
-    <p>Hospitals produce very different kinds of data: <b>pictures</b>, <b>charts over time</b> (heart rate…),
-       <b>surgery videos</b>, <b>text notes</b> and <b>3D shapes</b>. Modern AI reads <b>tokens</b> — small numbered pieces.</p>
-    <p>This project builds a <b>tokenizer</b> (a translator) that turns <i>every</i> kind of medical data into tokens from
-       <b>one shared dictionary of ${INFO ? INFO.vocab_size.toLocaleString() : "13,824"} tokens</b>, so one AI model can read all of them.</p>
-    <div class="flow" style="margin:18px 0">
-      <div class="card" style="margin:0">🩻 📈 🎥 📝<br><span class="muted">medical data</span></div>
-      <div class="arrow">→</div>
-      <div class="card" style="margin:0"><b>tokenizer</b><br><span class="muted">cut + number the pieces</span></div>
-      <div class="arrow">→</div>
-      <div class="card" style="margin:0"><code>&lt;IMAGE_VQ:17&gt; &lt;VAR:HR&gt; &lt;DT:60m&gt; …</code><br><span class="muted">one token sequence</span></div>
-      <div class="arrow">→</div>
-      <div class="card" style="margin:0">🤖 one AI model<br><span class="muted">disease? survival? phase?</span></div>
+  <div class="hero">
+    <div class="eyebrow">Undergraduate thesis · research prototype</div>
+    <h2>One token language for different kinds of medical data</h2>
+    <p>Hospitals produce pictures, charts over time, surgery videos and written notes. Modern AI models read <b>tokens</b>.
+       MedTok turns every kind of medical data into tokens from <b>one shared vocabulary</b>, written in one data protocol,
+       so a single model can read all of them.</p>
+    <div class="cta"><button class="primary" data-go="image">Explore the tokenizer</button><button data-go="results">View results</button></div>
+  </div>
+  <div class="kpis">
+    <div class="kpi"><div class="v">${INFO.vocab_size.toLocaleString()}</div><div class="l">tokens in the shared vocabulary</div></div>
+    <div class="kpi"><div class="v">${INFO.image_codebook.toLocaleString()}</div><div class="l">entries in the image codebook</div></div>
+    <div class="kpi"><div class="v">${nImg.toLocaleString()}</div><div class="l">test images (3 MedMNIST sets)</div></div>
+    <div class="kpi"><div class="v">${INFO.n_stays.toLocaleString()}</div><div class="l">test ICU stays (PhysioNet 2012)</div></div>
+    <div class="kpi"><div class="v">${INFO.videos.length}</div><div class="l">test surgery videos (Cataract-101)</div></div>
+  </div>
+  <div class="card"><h3>How it works</h3>
+    <div class="pipe">
+      <div class="step"><div class="n">Step 1</div><b>Medical data</b><div class="d">Images, ICU charts, surgery video, notes (3D point clouds: interface only).</div></div>
+      <div class="step"><div class="n">Step 2</div><b>Tokenizer</b><div class="d">Cut each kind of data into pieces and give each piece a number.</div></div>
+      <div class="step"><div class="n">Step 3</div><b>One sequence</b><div class="d"><code>&lt;IMAGE_VQ:17&gt; &lt;VAR:HR&gt; &lt;DT:60m&gt; …</code> saved as JSONL.</div></div>
+      <div class="step"><div class="n">Step 4</div><b>One AI model</b><div class="d">Reads the tokens to classify images or predict ICU survival.</div></div>
+    </div></div>
+  <div class="card"><h3>Three ways to make tokens (compared in the thesis)</h3>
+    <div class="tri">
+      <div class="item"><span class="tag" style="background:#d7f0ff;color:#05668d">A · Continuous</span><b>Baseline</b>
+        <p>Keeps exact decimal numbers. Accurate, but these are <i>not</i> vocabulary tokens, so it is only the reference point.</p></div>
+      <div class="item"><span class="tag" style="background:#dbe8ff;color:#174ea6">B · VQ codebook</span><b>Learned dictionary</b>
+        <p>A codebook of small learned pieces; each part of the data is replaced by the number of the closest piece.</p></div>
+      <div class="item"><span class="tag" style="background:#ffe0e6;color:#a3123a">C · Events</span><b>What happened, and when</b>
+        <p>Writes only changes and times, e.g. “heart rate high, 1 hour later …”. Long but easy to read.</p></div>
+    </div></div>
+  <div class="card"><h3>What we measure</h3>
+    <div class="tri">
+      <div class="item"><b>Information kept</b><p>Rebuild the data from the tokens and compare with the original (PSNR, SSIM, MAE).</p></div>
+      <div class="item"><b>Size</b><p>Number of tokens and bits, including delimiters and metadata (compression ratio).</p></div>
+      <div class="item"><b>Usefulness</b><p>Train a model on the tokens: images by AUROC and macro-F1, ICU survival by AUROC and AUPRC.</p></div>
     </div>
-    <h3>Three ways to make tokens (we compare them)</h3>
-    <table>
-      <tr><th>Way</th><th style="text-align:left">Simple meaning</th></tr>
-      <tr><td><b>A. Continuous</b></td><td style="text-align:left">Keep exact decimal numbers. Accurate, but these are <i>not</i> real dictionary tokens. Used as the baseline.</td></tr>
-      <tr><td><b>B. VQ (codebook)</b></td><td style="text-align:left">A dictionary of ${INFO ? INFO.image_codebook : "1,024"} small pieces; each part of the data is replaced by the closest piece.</td></tr>
-      <tr><td><b>C. Events</b></td><td style="text-align:left">Write down only what happened and when, e.g. “heart rate = high, 1 hour later…”.</td></tr>
-    </table>
-    <h3>We check three things</h3>
-    <ol><li><b>Information kept</b> — can we rebuild the data from the tokens?</li>
-        <li><b>Smaller</b> — how many tokens, how many bits (compression ratio)?</li>
-        <li><b>Useful</b> — can an AI still do medical tasks from the tokens?</li></ol>
-    <p class="muted">Every example in this demo comes from a <b>test set</b> — data the models never saw during training.</p>
-  </div>`;
+    <p class="muted" style="margin:14px 0 0">Every example in this demo comes from a <b>test set</b>: data the models never saw during training.</p></div>`;
+  document.querySelectorAll("[data-go]").forEach(b => b.onclick = () => go(b.dataset.go));
 }
 
 // ---------------------------------------------------------------- image
@@ -130,7 +236,7 @@ function imageView(d, title) {
   const grid = v.codes.flat().map(k => `<div style="background:${PAL(k)}">${k}</div>`).join("");
   return `
   <div class="card">
-    <h3 style="margin-top:0">${title}</h3>
+    <h3>${title}</h3>
     <div class="flow">
       <figure><img src="${d.original}" width="168"><figcaption>original (28×28 pixels)${d.label ? `<br><b>${esc(d.label)}</b>` : ""}</figcaption></figure>
       <div class="arrow">→</div>
@@ -215,14 +321,14 @@ async function icu(i) {
     <div class="controls"><button class="act primary" id="rnd">Another test patient</button>
       <span class="muted">patient #${d.index} of ${INFO.n_stays} (record ${d.record}) · outcome: ${d.died ? "died in hospital" : "survived"}
       — the AI must predict this from the tokens</span></div>
-    <div class="card"><h3 style="margin-top:0">Measurements vs decoded tokens</h3>
+    <div class="card"><h3>Measurements vs decoded tokens</h3>
       <div class="charts">${Object.entries(d.series).map(([k, s]) => chart(k, s)).join("")}</div>
       <p class="legend muted"><span>● original</span><span style="color:#a3123a">— events</span><span style="color:#17663a">— VQ</span><span style="color:#2f6fde">— continuous</span></p></div>
-    <div class="card"><h3 style="margin-top:0">How many tokens for this patient?</h3>
+    <div class="card"><h3>How many tokens for this patient?</h3>
       <table><tr><th>way</th><th>positions</th><th>dictionary tokens</th><th>decimal vectors</th><th>smaller by</th></tr>
       ${["event","vq","continuous"].map(k => `<tr><td>${k}</td><td>${r[k].positions}</td><td>${r[k].vocab_tokens}</td><td>${r[k].cont_vectors}</td><td>${f(r[k].ratio,1)}×</td></tr>`).join("")}</table>
       <p class="muted">Events are long but readable and keep every measurement time. VQ is short (a few codes per 4-hour window) but blurs details.</p></div>
-    <div class="card"><h3 style="margin-top:0">The event tokens (first 160 of ${d.n_tokens})</h3>
+    <div class="card"><h3>The event tokens (first 160 of ${d.n_tokens})</h3>
       <p class="muted"><code>&lt;VAR:HR&gt;&lt;VBIN:9&gt;</code> = “heart rate, value in bin 9 of 16”. <code>&lt;DT:…&gt;</code> = “time passes”.
         The first block (<code>&lt;STATIC&gt;</code>) is age, gender, height, ICU type.</p>
       <div class="toks">${tokSpans(d.tokens)}</div></div>`;
@@ -248,13 +354,13 @@ async function video(v, clip) {
       <select id="vid">${INFO.videos.map(x => `<option ${x===d.video?"selected":""}>${x}</option>`).join("")}</select>
       <button class="act" id="prev">◀ earlier clip</button><button class="act" id="next">later clip ▶</button>
       <span class="muted">test video ${d.video} · ${f(d.minutes,1)} min · clip ${d.clip+1} of ${d.n_clips} · phase now: <b>${esc(d.phase_now)}</b></span></div>
-    <div class="card"><h3 style="margin-top:0">Surgery phases (event tokens)</h3>
+    <div class="card"><h3>Surgery phases (event tokens)</h3>
       <div style="position:relative"><div class="timeline">${tl}</div><div class="marker" style="left:${d.clip_pos*100}%"></div></div>
       <p class="muted">${[...new Map(d.timeline.filter(s=>s.phase>=0).map(s=>[s.phase, s.name])).entries()].sort((a,b)=>a[0]-b[0]).map(([p,n])=>`<span style="color:${PHC[p]}">■</span> ${esc(n)}`).join(" &nbsp; ")}</p>
       <p>Decode check: phases rebuilt from tokens are ${d.phase_roundtrip ? '<span class="ok">exactly the same ✓</span>' : '<span class="bad">different ✗</span>'}
         — the whole surgery's phases need only <b>${d.phase_tokens.length}</b> tokens.</p>
       <details><summary>Show the phase tokens</summary><div class="toks" style="margin-top:8px">${tokSpans(d.phase_tokens)}</div></details></div>
-    <div class="card"><h3 style="margin-top:0">One 8-second clip</h3>
+    <div class="card"><h3>One 8-second clip</h3>
       <p class="muted">original</p><div class="frames">${d.original.map(s=>`<img src="${s}">`).join("")}</div>
       <p class="muted">rebuilt from ${d.vq.vocab_tokens} VQ tokens (${f(d.vq.ratio,0)}× smaller)</p><div class="frames">${d.vq.recon.map(s=>`<img src="${s}">`).join("")}</div>
       <p class="muted">rebuilt from ${d.continuous.cont_vectors} continuous vectors (${f(d.continuous.ratio,0)}× smaller)</p><div class="frames">${d.continuous.recon.map(s=>`<img src="${s}">`).join("")}</div></div>`;
@@ -275,11 +381,11 @@ async function text(i) {
       The text tokenizer cuts the note into sub-word pieces. The test: decode the pieces and check we get the <b>exact same text</b>
       and every value, time and negation back. The note never contains the outcome, so it cannot leak the answer.</div>
     <div class="controls"><button class="act primary" id="rnd">Another note</button><span class="muted">source tag: <code>${esc(d.source)}</code></span></div>
-    <div class="card"><h3 style="margin-top:0">The synthetic note (${d.chars} characters)</h3><p>${esc(d.note)}</p></div>
-    <div class="card"><h3 style="margin-top:0">Cut into ${d.n_tokens} text tokens</h3>
+    <div class="card"><h3>The synthetic note (${d.chars} characters)</h3><p>${esc(d.note)}</p></div>
+    <div class="card"><h3>Cut into ${d.n_tokens} text tokens</h3>
       <div class="toks">${d.pieces.map((p,k)=>`<span class="tok t-subword" title="id ${d.ids[k]}">${esc(piece(p))}</span>`).join("")}</div>
       <p class="muted">“·” marks a space before the piece.</p></div>
-    <div class="card"><h3 style="margin-top:0">Decoded again</h3><p>${esc(d.decoded)}</p>
+    <div class="card"><h3>Decoded again</h3><p>${esc(d.decoded)}</p>
       <p>Exact same text: ${d.exact ? '<span class="ok">yes ✓</span>' : '<span class="bad">no ✗</span>'} &nbsp;
          All ${d.fields.length} values / times / negations kept: ${d.fields_ok ? '<span class="ok">yes ✓</span>' : '<span class="bad">no ✗</span>'}</p>
       <p class="muted">Checked fields: ${d.fields.map(esc).join(" · ")}</p></div>`;
@@ -301,9 +407,9 @@ async function seq(i) {
       Colours = token type.</div>
     <div class="controls"><button class="act primary" id="rnd">Another patient</button>
       <span class="muted">${d.n} tokens · parts: ${d.spans.map(s=>`${s.modality} (${s.rep})`).join(" + ")}</span></div>
-    <div class="card"><h3 style="margin-top:0">Token types in this sequence</h3><div class="toks">${types}</div></div>
-    <div class="card"><h3 style="margin-top:0">The sequence (first 400 tokens)</h3><div class="toks" style="max-height:460px">${tokSpans(d.tokens)}</div></div>
-    <div class="card"><h3 style="margin-top:0">Saved as JSONL (the file format of the protocol), first 12 lines</h3>
+    <div class="card"><h3>Token types in this sequence</h3><div class="toks">${types}</div></div>
+    <div class="card"><h3>The sequence (first 400 tokens)</h3><div class="toks" style="max-height:460px">${tokSpans(d.tokens)}</div></div>
+    <div class="card"><h3>Saved as JSONL (the file format of the protocol), first 12 lines</h3>
       <pre>${d.jsonl.map(esc).join("\n")}</pre>
       <p class="muted">Every token keeps its id, readable form, type, modality, time (minutes) and position, so the file can be
         read back exactly.</p></div>`;
@@ -347,13 +453,21 @@ async function results() {
 const VIEWS = {start, image: () => image(), icu: () => icu(), video: () => video(), text: () => text(), seq: () => seq(), results};
 function show(tab) {
   if (!VIEWS[tab]) tab = "start";
+  const t = TABS.find(x => x[0] === tab);
   document.querySelectorAll("nav button").forEach(b => b.classList.toggle("on", b.dataset.t === tab));
+  $("#crumb").textContent = t[4]; $("#ptitle").textContent = t[2];
+  document.title = `${t[1]} · MedTok`;
+  window.scrollTo(0, 0);
   VIEWS[tab]();
 }
 function go(tab) { if (location.hash.slice(1) === tab) show(tab); else location.hash = tab; }
 window.addEventListener("hashchange", () => INFO && show(location.hash.slice(1)));
-$("#nav").innerHTML = TABS.map(([k, n]) => `<button data-t="${k}">${n}</button>`).join("");
-$("#nav").onclick = e => { if (e.target.dataset.t) go(e.target.dataset.t); };
+let lastGrp = null;
+$("#nav").innerHTML = TABS.map(([k, n, , icon, grp]) => {
+  const g = grp !== lastGrp && grp !== "Start" ? `<div class="grp">${grp}</div>` : ""; lastGrp = grp;
+  return `${g}<button data-t="${k}">${icon}<span>${n}</span></button>`;
+}).join("");
+$("#nav").onclick = e => { const b = e.target.closest("button"); if (b) go(b.dataset.t); };
 api("/api/info").then(i => { INFO = i; show((location.hash || "#start").slice(1)); }).catch(fail);
 </script>
 </body>
