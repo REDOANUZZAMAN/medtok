@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>MedTok demo — one token language for medical data</title>
+<style>
+  :root { --ink:#1d2433; --ink2:#5b6475; --line:#e3e6ec; --bg:#f7f8fa; --card:#fff; --accent:#2f6fde;
+          --ok:#1f8a4c; --warn:#b4541a; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; color:var(--ink); background:var(--bg); }
+  header { background:var(--card); border-bottom:1px solid var(--line); padding:14px 24px; display:flex; gap:24px;
+           align-items:center; flex-wrap:wrap; }
+  header h1 { font-size:18px; margin:0; }
+  header .sub { color:var(--ink2); font-size:13px; }
+  nav { display:flex; gap:4px; flex-wrap:wrap; }
+  nav button { border:0; background:none; padding:8px 12px; border-radius:6px; cursor:pointer; font:inherit; color:var(--ink2); }
+  nav button.on { background:#e8effc; color:var(--accent); font-weight:600; }
+  main { max-width:1180px; margin:0 auto; padding:20px 24px 60px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:18px 20px; margin-bottom:16px; }
+  .explain { background:#f1f5fd; border-left:4px solid var(--accent); padding:12px 16px; border-radius:6px; margin-bottom:16px; }
+  .explain b { color:var(--accent); }
+  .row { display:flex; gap:20px; flex-wrap:wrap; align-items:flex-start; }
+  .col { flex:1; min-width:220px; }
+  .flow { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  .arrow { font-size:28px; color:var(--ink2); }
+  figure { margin:0; text-align:center; }
+  figure img { border-radius:6px; border:1px solid var(--line); image-rendering:pixelated; }
+  figcaption { font-size:13px; color:var(--ink2); margin-top:4px; }
+  .controls { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px; }
+  select, button.act { font:inherit; padding:6px 12px; border-radius:6px; border:1px solid var(--line); background:#fff; cursor:pointer; }
+  button.act.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  table { border-collapse:collapse; font-size:13px; }
+  th, td { border-bottom:1px solid var(--line); padding:5px 10px; text-align:right; }
+  th:first-child, td:first-child { text-align:left; }
+  th { color:var(--ink2); font-weight:600; }
+  .grid7 { display:grid; gap:2px; font:11px ui-monospace,monospace; }
+  .grid7 div { padding:4px 0; text-align:center; border-radius:3px; color:#fff; }
+  .toks { display:flex; flex-wrap:wrap; gap:3px; font:12px ui-monospace,monospace; max-height:340px; overflow:auto; }
+  .tok { padding:2px 5px; border-radius:4px; white-space:pre; }
+  .t-sequence_boundary, .t-special { background:#e4e7ee; color:#333; }
+  .t-modality_start, .t-modality_end { background:#1d2433; color:#fff; }
+  .t-representation { background:#5b6475; color:#fff; } .t-layout { background:#eceff3; color:#5b6475; }
+  .t-code { background:#dbe8ff; color:#174ea6; } .t-continuous { background:#d7f0ff; color:#05668d; }
+  .t-variable { background:#e9e2fb; color:#4b2a9c; } .t-value_bin { background:#f3e8ff; color:#6b2fb3; }
+  .t-time_delta { background:#fff4cc; color:#7a5b00; } .t-event { background:#ffe0e6; color:#a3123a; }
+  .t-segment { background:#e0f2f1; color:#00695c; } .t-subword { background:#e3f6e8; color:#17663a; }
+  .legend span { margin-right:8px; }
+  .big { font-size:26px; font-weight:700; }
+  .muted { color:var(--ink2); font-size:13px; }
+  .ok { color:var(--ok); font-weight:600; } .bad { color:var(--warn); font-weight:600; }
+  .frames { display:flex; gap:4px; flex-wrap:wrap; }
+  .frames img { width:96px; height:96px; }
+  .timeline { position:relative; height:26px; border-radius:6px; overflow:hidden; display:flex; margin:8px 0 4px; }
+  .timeline div { height:100%; }
+  .marker { position:absolute; top:-4px; width:3px; height:34px; background:#111; }
+  pre { background:#f6f7f9; border:1px solid var(--line); border-radius:6px; padding:10px; overflow:auto; font-size:12px; }
+  .stat { display:inline-block; margin-right:22px; }
+  .stat .big { display:block; }
+  .md table { margin:8px 0 18px; } .md h3 { margin:22px 0 6px; font-size:15px; } .md p { color:var(--ink2); font-size:13px; }
+  .err { color:var(--warn); }
+  .charts { display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:14px 22px; }
+  .chart svg { width:100%; height:auto; display:block; }
+</style>
+</head>
+<body>
+<header>
+  <div><h1>MedTok demo</h1><div class="sub">One token language for different medical data</div></div>
+  <nav id="nav"></nav>
+</header>
+<main id="main"></main>
+
+<script>
+const TABS = [
+  ["start", "Start here"], ["image", "1. Images"], ["icu", "2. ICU charts"], ["video", "3. Surgery video"],
+  ["text", "4. Text"], ["seq", "5. One shared sequence"], ["results", "6. Results"]];
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+const f = (x, d=2) => x == null ? "–" : (Math.abs(x) >= 1000 ? Math.round(x).toLocaleString() : Number(x).toFixed(d));
+async function api(path, body) {
+  const r = await fetch(path, body ? {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)} : {});
+  const j = await r.json(); if (j.error) throw new Error(j.error); return j;
+}
+const piece = (s) => String(s).replace(/\u0120/g, "·");   // BPE marks a leading space with "Ġ"; show it as "·"
+function tokSpans(toks) {
+  return toks.map(t => `<span class="tok t-${t.type}" title="${esc(t.type)}">${esc(piece(t.s))}</span>`).join("");
+}
+function loading(msg="Working…") { $("#main").innerHTML = `<div class="card muted">${msg}</div>`; }
+function fail(e) { $("#main").insertAdjacentHTML("afterbegin", `<div class="card err">Error: ${esc(e.message)}</div>`); }
+let INFO = null;
+
+// ---------------------------------------------------------------- start
+function start() {
+  $("#main").innerHTML = `
+  <div class="card">
+    <h2 style="margin-top:0">What is this?</h2>
+    <p>Hospitals produce very different kinds of data: <b>pictures</b>, <b>charts over time</b> (heart rate…),
+       <b>surgery videos</b>, <b>text notes</b> and <b>3D shapes</b>. Modern AI reads <b>tokens</b> — small numbered pieces.</p>
+    <p>This project builds a <b>tokenizer</b> (a translator) that turns <i>every</i> kind of medical data into tokens from
+       <b>one shared dictionary of ${INFO ? INFO.vocab_size.toLocaleString() : "13,824"} tokens</b>, so one AI model can read all of them.</p>
+    <div class="flow" style="margin:18px 0">
+      <div class="card" style="margin:0">🩻 📈 🎥 📝<br><span class="muted">medical data</span></div>
+      <div class="arrow">→</div>
+      <div class="card" style="margin:0"><b>tokenizer</b><br><span class="muted">cut + number the pieces</span></div>
+      <div class="arrow">→</div>
+      <div class="card" style="margin:0"><code>&lt;IMAGE_VQ:17&gt; &lt;VAR:HR&gt; &lt;DT:60m&gt; …</code><br><span class="muted">one token sequence</span></div>
+      <div class="arrow">→</div>
+      <div class="card" style="margin:0">🤖 one AI model<br><span class="muted">disease? survival? phase?</span></div>
+    </div>
+    <h3>Three ways to make tokens (we compare them)</h3>
+    <table>
+      <tr><th>Way</th><th style="text-align:left">Simple meaning</th></tr>
+      <tr><td><b>A. Continuous</b></td><td style="text-align:left">Keep exact decimal numbers. Accurate, but these are <i>not</i> real dictionary tokens. Used as the baseline.</td></tr>
+      <tr><td><b>B. VQ (codebook)</b></td><td style="text-align:left">A dictionary of ${INFO ? INFO.image_codebook : "1,024"} small pieces; each part of the data is replaced by the closest piece.</td></tr>
+      <tr><td><b>C. Events</b></td><td style="text-align:left">Write down only what happened and when, e.g. “heart rate = high, 1 hour later…”.</td></tr>
+    </table>
+    <h3>We check three things</h3>
+    <ol><li><b>Information kept</b> — can we rebuild the data from the tokens?</li>
+        <li><b>Smaller</b> — how many tokens, how many bits (compression ratio)?</li>
+        <li><b>Useful</b> — can an AI still do medical tasks from the tokens?</li></ol>
+    <p class="muted">Every example in this demo comes from a <b>test set</b> — data the models never saw during training.</p>
+  </div>`;
+}
+
+// ---------------------------------------------------------------- image
+const PAL = (k, n) => `hsl(${Math.round(360 * ((k * 0.618034) % 1))},55%,${38 + (k % 3) * 8}%)`;
+function imageView(d, title) {
+  const v = d.vq, c = d.continuous, n = v.codes.length;
+  const grid = v.codes.flat().map(k => `<div style="background:${PAL(k)}">${k}</div>`).join("");
+  return `
+  <div class="card">
+    <h3 style="margin-top:0">${title}</h3>
+    <div class="flow">
+      <figure><img src="${d.original}" width="168"><figcaption>original (28×28 pixels)${d.label ? `<br><b>${esc(d.label)}</b>` : ""}</figcaption></figure>
+      <div class="arrow">→</div>
+      <figure><div class="grid7" style="grid-template-columns:repeat(${n},32px)">${grid}</div>
+        <figcaption>${n}×${n} = ${n*n} codebook numbers<br>(+ ${n} &lt;ROW&gt; markers = ${v.positions} tokens)</figcaption></figure>
+      <div class="arrow">→</div>
+      <figure><img src="${v.recon}" width="168"><figcaption>rebuilt from <b>VQ tokens</b><br>PSNR ${f(v.psnr,1)} dB · SSIM ${f(v.ssim,3)}</figcaption></figure>
+      <figure><img src="${c.recon}" width="168"><figcaption>rebuilt from <b>continuous</b> vectors<br>PSNR ${f(c.psnr,1)} dB · SSIM ${f(c.ssim,3)}</figcaption></figure>
+    </div>
+    <table style="margin-top:14px">
+      <tr><th></th><th>positions</th><th>dictionary tokens</th><th>decimal vectors</th><th>raw bits</th><th>token bits</th><th>smaller by</th></tr>
+      <tr><td>VQ</td><td>${v.positions}</td><td>${v.vocab_tokens}</td><td>${v.cont_vectors}</td><td>${f(v.raw_bits,0)}</td><td>${f(v.token_bits,0)}</td><td><b>${f(v.ratio,1)}×</b></td></tr>
+      <tr><td>Continuous</td><td>${c.positions}</td><td>${c.vocab_tokens}</td><td>${c.cont_vectors}</td><td>${f(c.raw_bits,0)}</td><td>${f(c.token_bits,0)}</td><td><b>${f(c.ratio,2)}×</b></td></tr>
+    </table>
+    <p class="muted">“Smaller by” = raw bits ÷ token bits. Above 1 means the tokens take less space than the pixels. The continuous version
+      keeps 16-bit decimals, so it is often <i>bigger</i> than the picture — that is why it is only a baseline.</p>
+    <details><summary>Show the actual token sequence</summary><div class="toks" style="margin-top:8px">${tokSpans(v.tokens)}</div></details>
+  </div>`;
+}
+async function image(sub = "bloodmnist", i) {
+  loading();
+  try {
+    const d = await api(`/api/image?subset=${sub}` + (i != null ? `&i=${i}` : ""));
+    $("#main").innerHTML = `
+    <div class="explain"><b>What am I looking at?</b> A small medical picture is cut into a 7×7 grid of pieces. Each piece is
+      replaced by the number of the most similar entry in a <b>codebook</b> (a dictionary of ${INFO.image_codebook} learned picture
+      pieces). Only those numbers are kept. On the right, the picture is <b>rebuilt from the numbers alone</b>, so you can see how
+      much information survived. PSNR/SSIM: higher = closer to the original.</div>
+    <div class="controls">
+      <select id="sub">${["bloodmnist","pneumoniamnist","dermamnist"].map(s => `<option ${s===sub?"selected":""} value="${s}">${{bloodmnist:"Blood cells",pneumoniamnist:"Chest X-ray",dermamnist:"Skin lesion"}[s]}</option>`).join("")}</select>
+      <button class="act primary" id="rnd">Another test image</button>
+      <label class="act" style="padding:6px 12px;border:1px solid var(--line);border-radius:6px;cursor:pointer;background:#fff">
+        Try your own picture<input type="file" id="up" accept="image/*" hidden></label>
+      <span class="muted">test image #${d.index} of ${INFO.image_counts[sub].toLocaleString()}</span>
+    </div>
+    <div id="imgview">${imageView(d, "Image → tokens → image")}</div>`;
+    $("#sub").onchange = e => image(e.target.value);
+    $("#rnd").onclick = () => image($("#sub").value);
+    $("#up").onchange = e => {
+      const file = e.target.files[0]; if (!file) return;
+      const rd = new FileReader();
+      rd.onload = async () => {
+        $("#imgview").innerHTML = `<div class="card muted">Tokenizing your picture…</div>`;
+        try { const u = await api("/api/image_upload", {png: rd.result});
+              $("#imgview").innerHTML = imageView(u, "Your picture (cropped to a square, shrunk to 28×28)"); }
+        catch (err) { $("#imgview").innerHTML = `<div class="card err">${esc(err.message)}</div>`; }
+      };
+      rd.readAsDataURL(file);
+    };
+  } catch (e) { fail(e); }
+}
+
+// ---------------------------------------------------------------- icu
+function chart(name, s) {
+  const W = 520, H = 150, P = 28, hours = s.hours.length;
+  const keys = [["original","#1d2433"],["event","#a3123a"],["vq","#17663a"],["continuous","#2f6fde"]];
+  const vals = keys.flatMap(([k]) => (s[k] || []).filter(v => v != null));
+  if (!vals.length) return `<div class="chart"><b>${name}</b><div class="muted">not measured for this patient</div></div>`;
+  let lo = Math.min(...vals), hi = Math.max(...vals); if (hi - lo < 1e-6) { hi += 1; lo -= 1; }
+  const x = h => P + (W - P - 6) * h / (hours - 1), y = v => H - 18 - (H - 30) * (v - lo) / (hi - lo);
+  const paths = keys.map(([k, col]) => {
+    const pts = (s[k] || []).map((v, h) => v == null ? null : [x(h), y(v)]).filter(Boolean);
+    if (!pts.length) return "";
+    const dots = k === "original" ? pts.map(p => `<circle cx="${p[0]}" cy="${p[1]}" r="2.6" fill="${col}"/>`).join("") : "";
+    return `<polyline fill="none" stroke="${col}" stroke-width="${k==="original"?1:1.6}" ${k==="original"?'stroke-dasharray="2 3"':''} points="${pts.map(p=>p.join(",")).join(" ")}"/>${dots}`;
+  }).join("");
+  return `<div class="chart"><b>${name}</b>
+    <svg viewBox="0 0 ${W} ${H}"><text x="2" y="12" font-size="10" fill="#888">${f(hi,1)}</text><text x="2" y="${H-20}" font-size="10" fill="#888">${f(lo,1)}</text>
+    <text x="${W-60}" y="${H-3}" font-size="10" fill="#888">hour 0–47</text>${paths}</svg></div>`;
+}
+async function icu(i) {
+  loading();
+  try {
+    const d = await api("/api/icu" + (i != null ? `?i=${i}` : ""));
+    const r = d.reps;
+    $("#main").innerHTML = `
+    <div class="explain"><b>What am I looking at?</b> One ICU patient's first 48 hours: heart rate, blood pressure, temperature…
+      measured at irregular times. The black dots are the real measurements. The coloured lines are what we get back
+      <b>after turning the chart into tokens and decoding them again</b>: <span style="color:#a3123a">events</span>,
+      <span style="color:#17663a">VQ codebook</span> and <span style="color:#2f6fde">continuous</span>. Closer to the dots = more
+      information kept.</div>
+    <div class="controls"><button class="act primary" id="rnd">Another test patient</button>
+      <span class="muted">patient #${d.index} of ${INFO.n_stays} (record ${d.record}) · outcome: ${d.died ? "died in hospital" : "survived"}
+      — the AI must predict this from the tokens</span></div>
+    <div class="card"><h3 style="margin-top:0">Measurements vs decoded tokens</h3>
+      <div class="charts">${Object.entries(d.series).map(([k, s]) => chart(k, s)).join("")}</div>
+      <p class="legend muted"><span>● original</span><span style="color:#a3123a">— events</span><span style="color:#17663a">— VQ</span><span style="color:#2f6fde">— continuous</span></p></div>
+    <div class="card"><h3 style="margin-top:0">How many tokens for this patient?</h3>
+      <table><tr><th>way</th><th>positions</th><th>dictionary tokens</th><th>decimal vectors</th><th>smaller by</th></tr>
+      ${["event","vq","continuous"].map(k => `<tr><td>${k}</td><td>${r[k].positions}</td><td>${r[k].vocab_tokens}</td><td>${r[k].cont_vectors}</td><td>${f(r[k].ratio,1)}×</td></tr>`).join("")}</table>
+      <p class="muted">Events are long but readable and keep every measurement time. VQ is short (a few codes per 4-hour window) but blurs details.</p></div>
+    <div class="card"><h3 style="margin-top:0">The event tokens (first 160 of ${d.n_tokens})</h3>
+      <p class="muted"><code>&lt;VAR:HR&gt;&lt;VBIN:9&gt;</code> = “heart rate, value in bin 9 of 16”. <code>&lt;DT:…&gt;</code> = “time passes”.
+        The first block (<code>&lt;STATIC&gt;</code>) is age, gender, height, ICU type.</p>
+      <div class="toks">${tokSpans(d.tokens)}</div></div>`;
+    $("#rnd").onclick = () => icu();
+  } catch (e) { fail(e); }
+}
+
+// ---------------------------------------------------------------- video
+const PHC = ["#4e79a7","#f28e2b","#e15759","#76b7b2","#59a14f","#edc948","#b07aa1","#ff9da7","#9c755f","#bab0ac"];
+async function video(v, clip) {
+  loading("Decoding video…");
+  try {
+    const q = new URLSearchParams(); if (v != null) q.set("v", v); if (clip != null) q.set("clip", clip);
+    const d = await api("/api/video?" + q);
+    const tl = d.timeline.map(s => `<div title="${esc(s.name)}" style="width:${(s.end-s.start)*100}%;background:${s.phase<0?"#ddd":PHC[s.phase]}"></div>`).join("");
+    $("#main").innerHTML = `
+    <div class="explain"><b>What am I looking at?</b> Cataract (eye) surgery videos from <b>Cataract-101</b>. The video is cut into
+      8-second clips (8 frames, 1 per second). Each clip becomes 2×4×4 = 32 codebook tokens. Below: the real frames, and the
+      frames <b>rebuilt from the tokens</b>. The coloured bar is the surgery's 10 phases written as <b>event tokens</b> taken from
+      the doctors' labels.<br><span class="muted">Important: phase events made from the true labels only show that labels can be
+      <i>stored</i> as tokens. They do not show the AI <i>recognising</i> phases. Results are not comparable with Cholec80.</span></div>
+    <div class="controls">
+      <select id="vid">${INFO.videos.map(x => `<option ${x===d.video?"selected":""}>${x}</option>`).join("")}</select>
+      <button class="act" id="prev">◀ earlier clip</button><button class="act" id="next">later clip ▶</button>
+      <span class="muted">test video ${d.video} · ${f(d.minutes,1)} min · clip ${d.clip+1} of ${d.n_clips} · phase now: <b>${esc(d.phase_now)}</b></span></div>
+    <div class="card"><h3 style="margin-top:0">Surgery phases (event tokens)</h3>
+      <div style="position:relative"><div class="timeline">${tl}</div><div class="marker" style="left:${d.clip_pos*100}%"></div></div>
+      <p class="muted">${[...new Map(d.timeline.filter(s=>s.phase>=0).map(s=>[s.phase, s.name])).entries()].sort((a,b)=>a[0]-b[0]).map(([p,n])=>`<span style="color:${PHC[p]}">■</span> ${esc(n)}`).join(" &nbsp; ")}</p>
+      <p>Decode check: phases rebuilt from tokens are ${d.phase_roundtrip ? '<span class="ok">exactly the same ✓</span>' : '<span class="bad">different ✗</span>'}
+        — the whole surgery's phases need only <b>${d.phase_tokens.length}</b> tokens.</p>
+      <details><summary>Show the phase tokens</summary><div class="toks" style="margin-top:8px">${tokSpans(d.phase_tokens)}</div></details></div>
+    <div class="card"><h3 style="margin-top:0">One 8-second clip</h3>
+      <p class="muted">original</p><div class="frames">${d.original.map(s=>`<img src="${s}">`).join("")}</div>
+      <p class="muted">rebuilt from ${d.vq.vocab_tokens} VQ tokens (${f(d.vq.ratio,0)}× smaller)</p><div class="frames">${d.vq.recon.map(s=>`<img src="${s}">`).join("")}</div>
+      <p class="muted">rebuilt from ${d.continuous.cont_vectors} continuous vectors (${f(d.continuous.ratio,0)}× smaller)</p><div class="frames">${d.continuous.recon.map(s=>`<img src="${s}">`).join("")}</div></div>`;
+    $("#vid").onchange = e => video(+e.target.value);
+    $("#prev").onclick = () => video(d.video, Math.max(0, d.clip - 3));
+    $("#next").onclick = () => video(d.video, d.clip + 3);
+  } catch (e) { fail(e); }
+}
+
+// ---------------------------------------------------------------- text
+async function text(i) {
+  loading();
+  try {
+    const d = await api("/api/text" + (i != null ? `?i=${i}` : ""));
+    $("#main").innerHTML = `
+    <div class="explain"><b>What am I looking at?</b> Real doctor notes are private, so the project makes <b>synthetic (fake) notes</b>
+      from the first hour of each ICU stay using templates (version 2: with times, “no/not” sentences, units and missing values).
+      The text tokenizer cuts the note into sub-word pieces. The test: decode the pieces and check we get the <b>exact same text</b>
+      and every value, time and negation back. The note never contains the outcome, so it cannot leak the answer.</div>
+    <div class="controls"><button class="act primary" id="rnd">Another note</button><span class="muted">source tag: <code>${esc(d.source)}</code></span></div>
+    <div class="card"><h3 style="margin-top:0">The synthetic note (${d.chars} characters)</h3><p>${esc(d.note)}</p></div>
+    <div class="card"><h3 style="margin-top:0">Cut into ${d.n_tokens} text tokens</h3>
+      <div class="toks">${d.pieces.map((p,k)=>`<span class="tok t-subword" title="id ${d.ids[k]}">${esc(piece(p))}</span>`).join("")}</div>
+      <p class="muted">“·” marks a space before the piece.</p></div>
+    <div class="card"><h3 style="margin-top:0">Decoded again</h3><p>${esc(d.decoded)}</p>
+      <p>Exact same text: ${d.exact ? '<span class="ok">yes ✓</span>' : '<span class="bad">no ✗</span>'} &nbsp;
+         All ${d.fields.length} values / times / negations kept: ${d.fields_ok ? '<span class="ok">yes ✓</span>' : '<span class="bad">no ✗</span>'}</p>
+      <p class="muted">Checked fields: ${d.fields.map(esc).join(" · ")}</p></div>`;
+    $("#rnd").onclick = () => text();
+  } catch (e) { fail(e); }
+}
+
+// ---------------------------------------------------------------- sequence
+async function seq(i) {
+  loading();
+  try {
+    const d = await api("/api/sequence" + (i != null ? `?i=${i}` : ""));
+    const types = Object.entries(d.type_counts).map(([k,n]) => `<span class="tok t-${k}">${k}: ${n}</span>`).join(" ");
+    $("#main").innerHTML = `
+    <div class="explain"><b>What am I looking at?</b> This is the main idea of the project: <b>two different kinds of data in one
+      token sequence</b>. Here a patient's synthetic note (text) and ICU chart (events) are written one after the other with the
+      same dictionary. Special tokens like <code>&lt;TEXT_START&gt;</code> and <code>&lt;TIME_SERIES_START&gt;</code> mark where
+      each part begins and ends, and <code>&lt;REP:…&gt;</code> says which way it was tokenized. One AI model can read all of it.
+      Colours = token type.</div>
+    <div class="controls"><button class="act primary" id="rnd">Another patient</button>
+      <span class="muted">${d.n} tokens · parts: ${d.spans.map(s=>`${s.modality} (${s.rep})`).join(" + ")}</span></div>
+    <div class="card"><h3 style="margin-top:0">Token types in this sequence</h3><div class="toks">${types}</div></div>
+    <div class="card"><h3 style="margin-top:0">The sequence (first 400 tokens)</h3><div class="toks" style="max-height:460px">${tokSpans(d.tokens)}</div></div>
+    <div class="card"><h3 style="margin-top:0">Saved as JSONL (the file format of the protocol), first 12 lines</h3>
+      <pre>${d.jsonl.map(esc).join("\n")}</pre>
+      <p class="muted">Every token keeps its id, readable form, type, modality, time (minutes) and position, so the file can be
+        read back exactly.</p></div>`;
+    $("#rnd").onclick = () => seq();
+  } catch (e) { fail(e); }
+}
+
+// ---------------------------------------------------------------- results
+function md(src) {
+  const out = []; const lines = src.split("\n"); let i = 0;
+  while (i < lines.length) {
+    const l = lines[i];
+    if (l.startsWith("|")) {
+      const rows = []; while (i < lines.length && lines[i].startsWith("|")) rows.push(lines[i++]);
+      const cells = r => r.split("|").slice(1, -1).map(c => esc(c.trim()));
+      out.push(`<table><tr>${cells(rows[0]).map(c=>`<th>${c}</th>`).join("")}</tr>${rows.slice(2).map(r=>`<tr>${cells(r).map(c=>`<td>${c}</td>`).join("")}</tr>`).join("")}</table>`);
+      continue;
+    }
+    if (l.startsWith("### ")) out.push(`<h3>${esc(l.slice(4))}</h3>`);
+    else if (l.startsWith("## ")) out.push(`<h3>${esc(l.slice(3))}</h3>`);
+    else if (l.startsWith("# ")) out.push(`<h2>${esc(l.slice(2))}</h2>`);
+    else if (l.startsWith("![")) {}
+    else if (l.trim()) out.push(`<p>${esc(l)}</p>`);
+    i++;
+  }
+  return out.join("");
+}
+async function results() {
+  loading();
+  try {
+    const d = await api("/api/results");
+    $("#main").innerHTML = `
+    <div class="explain"><b>What am I looking at?</b> The full results table, made automatically by
+      <code>python -m medical_tokenizer.report</code> (numbers are never typed by hand). Downstream tasks: images are scored with
+      <b>AUROC</b> and <b>macro-F1</b>, ICU survival with <b>AUROC</b> and <b>AUPRC</b> — all between 0 and 1, higher is better.</div>
+    <div class="card md" style="overflow:auto">${md(d.markdown)}</div>`;
+  } catch (e) { fail(e); }
+}
+
+// ---------------------------------------------------------------- nav
+const VIEWS = {start, image: () => image(), icu: () => icu(), video: () => video(), text: () => text(), seq: () => seq(), results};
+function show(tab) {
+  if (!VIEWS[tab]) tab = "start";
+  document.querySelectorAll("nav button").forEach(b => b.classList.toggle("on", b.dataset.t === tab));
+  VIEWS[tab]();
+}
+function go(tab) { if (location.hash.slice(1) === tab) show(tab); else location.hash = tab; }
+window.addEventListener("hashchange", () => INFO && show(location.hash.slice(1)));
+$("#nav").innerHTML = TABS.map(([k, n]) => `<button data-t="${k}">${n}</button>`).join("");
+$("#nav").onclick = e => { if (e.target.dataset.t) go(e.target.dataset.t); };
+api("/api/info").then(i => { INFO = i; show((location.hash || "#start").slice(1)); }).catch(fail);
+</script>
+</body>
+</html>

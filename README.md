@@ -51,6 +51,21 @@ python -m medical_tokenizer.pipeline --config configs/ablations.yaml --skip-exis
 python -m medical_tokenizer.report
 ```
 
+## Demo app
+
+```bash
+.venv/bin/python demo/server.py --port 8093     # open http://<host>:8093
+```
+
+A browser demo (standard library server + one HTML page, `demo/`). It shows, on test-set samples, each modality
+turned into tokens and decoded again (images, ICU charts, surgery video and phase events, synthetic text), one
+mixed text + time-series token sequence with its JSONL form, and `reports/RESULTS.md`. You can also upload your own picture.
+
+## GPU re-runs on Modal (optional)
+
+Training loops use CUDA when available (`MEDTOK_DEVICE` overrides). `scripts/modal_rerun.py` runs the plans in
+`configs/rerun_gpu/` as four parallel Modal jobs and merges the new runs back into `experiments/`.
+
 ## Using the toolkit
 
 ```python
