@@ -42,27 +42,27 @@ Cataract-101 (10 phases, video-level split) replaces Cholec80; results are not c
 
 ### Downstream tasks (test set, mean ± std over seeds)
 
-Fixed splits and an identical model / training budget per task. Images: AUROC and macro-F1; ICU mortality: AUROC and AUPRC. Text in ds_mortality_event_text is synthetic (admission-time fields only, no outcome). Surgical phase uses Cataract-101 and is not comparable with Cholec80 results.
+Fixed splits and an identical model / training budget per task; class-weighted loss, binary-task cut-off chosen on validation. Images: AUROC and macro-F1; ICU mortality: AUROC and AUPRC. Text in ds_mortality_event_text is synthetic (admission-time fields only, no outcome). Surgical phase uses Cataract-101 and is not comparable with Cholec80 results.
 
 | task | experiment | seq len (train mean) | metric 1 | metric 2 | metric 3 | seeds |
 |---|---|---|---|---|---|---|
-| bloodmnist | ds_bloodmnist_continuous | 54.000 | auroc 0.983 ± 0.002 | macro_f1 0.838 ± 0.015 | acc 0.859 ± 0.012 | 3 |
-| bloodmnist | ds_bloodmnist_vq | 61.000 | auroc 0.966 ± 0.001 | macro_f1 0.759 ± 0.007 | acc 0.795 ± 0.008 | 3 |
-| pneumoniamnist | ds_pneumoniamnist_continuous | 54.000 | auroc 0.940 ± 0.007 | macro_f1 0.838 ± 0.008 | acc 0.859 ± 0.007 | 3 |
-| pneumoniamnist | ds_pneumoniamnist_vq | 61.000 | auroc 0.918 ± 0.006 | macro_f1 0.785 ± 0.002 | acc 0.817 ± 0.003 | 3 |
-| dermamnist | ds_dermamnist_continuous | 54.000 | auroc 0.888 ± 0.001 | macro_f1 0.363 ± 0.005 | acc 0.723 ± 0.001 | 3 |
-| dermamnist | ds_dermamnist_vq | 61.000 | auroc 0.837 ± 0.007 | macro_f1 0.274 ± 0.023 | acc 0.688 ± 0.002 | 3 |
-| mortality | ds_mortality_continuous | 61.026 | auroc 0.783 ± 0.003 | auprc 0.428 ± 0.003 | balanced_acc 0.534 ± 0.033 | 3 |
-| mortality | ds_mortality_vq | 73.026 | auroc 0.727 ± 0.017 | auprc 0.324 ± 0.022 | balanced_acc 0.519 ± 0.010 | 3 |
-| mortality | ds_mortality_event | 775.012 | auroc 0.778 ± 0.006 | auprc 0.425 ± 0.021 | balanced_acc 0.628 ± 0.004 | 3 |
-| mortality | ds_mortality_event_change | 542.872 | auroc 0.763 ± 0.018 | auprc 0.366 ± 0.035 | balanced_acc 0.567 ± 0.043 | 3 |
-| mortality | ds_mortality_event_text | 830.342 | auroc 0.783 ± 0.003 | auprc 0.436 ± 0.027 | balanced_acc 0.611 ± 0.005 | 3 |
-| surgical_phase | ds_phase_continuous | 133.000 | macro_f1 0.047 ± 0.000 | acc 0.306 ± 0.000 | balanced_acc 0.100 ± 0.000 | 3 |
-| surgical_phase | ds_phase_vq | 137.000 | macro_f1 0.152 ± 0.019 | acc 0.246 ± 0.020 | balanced_acc 0.156 ± 0.019 | 3 |
-| surgical_phase | ds_phase_segments | 10.669 | macro_f1 0.102 ± 0.018 | acc 0.257 ± 0.014 | balanced_acc 0.117 ± 0.009 | 3 |
-| bloodmnist | ds_multitask_vq (joint) | 61.000 | auroc 0.962 ± 0.001 | – | – | 3 |
-| mortality | ds_multitask_vq (joint) | 73.026 | auroc 0.729 ± 0.006 | – | – | 3 |
-| surgical_phase | ds_multitask_vq (joint) | 137.000 | macro_f1 0.137 ± 0.007 | – | – | 3 |
+| bloodmnist | ds_bloodmnist_continuous | 54.000 | auroc 0.981 ± 0.001 | macro_f1 0.820 ± 0.008 | acc 0.840 ± 0.008 | 3 |
+| bloodmnist | ds_bloodmnist_vq | 61.000 | auroc 0.963 ± 0.001 | macro_f1 0.749 ± 0.001 | acc 0.779 ± 0.001 | 3 |
+| pneumoniamnist | ds_pneumoniamnist_continuous | 54.000 | auroc 0.939 ± 0.002 | macro_f1 0.868 ± 0.003 | acc 0.881 ± 0.000 | 3 |
+| pneumoniamnist | ds_pneumoniamnist_vq | 61.000 | auroc 0.928 ± 0.007 | macro_f1 0.807 ± 0.017 | acc 0.832 ± 0.011 | 3 |
+| dermamnist | ds_dermamnist_continuous | 54.000 | auroc 0.874 ± 0.003 | macro_f1 0.372 ± 0.003 | acc 0.546 ± 0.005 | 3 |
+| dermamnist | ds_dermamnist_vq | 61.000 | auroc 0.820 ± 0.019 | macro_f1 0.295 ± 0.019 | acc 0.529 ± 0.028 | 3 |
+| mortality | ds_mortality_continuous | 61.026 | auroc 0.794 ± 0.009 | auprc 0.437 ± 0.008 | balanced_acc 0.711 ± 0.019 | 3 |
+| mortality | ds_mortality_vq | 73.026 | auroc 0.745 ± 0.010 | auprc 0.329 ± 0.036 | balanced_acc 0.677 ± 0.007 | 3 |
+| mortality | ds_mortality_event | 775.012 | auroc 0.792 ± 0.017 | auprc 0.455 ± 0.021 | balanced_acc 0.683 ± 0.031 | 3 |
+| mortality | ds_mortality_event_change | 542.872 | auroc 0.756 ± 0.003 | auprc 0.346 ± 0.016 | balanced_acc 0.666 ± 0.004 | 3 |
+| mortality | ds_mortality_event_text | 830.342 | auroc 0.800 ± 0.010 | auprc 0.440 ± 0.014 | balanced_acc 0.711 ± 0.026 | 3 |
+| surgical_phase | ds_phase_continuous | 133.000 | macro_f1 0.081 ± 0.034 | acc 0.231 ± 0.037 | balanced_acc 0.130 ± 0.049 | 3 |
+| surgical_phase | ds_phase_vq | 137.000 | macro_f1 0.159 ± 0.016 | acc 0.219 ± 0.016 | balanced_acc 0.163 ± 0.022 | 3 |
+| surgical_phase | ds_phase_segments | 10.669 | macro_f1 0.111 ± 0.009 | acc 0.140 ± 0.013 | balanced_acc 0.133 ± 0.009 | 3 |
+| bloodmnist | ds_multitask_vq (joint) | 61.000 | auroc 0.958 ± 0.005 | – | – | 3 |
+| mortality | ds_multitask_vq (joint) | 73.026 | auroc 0.752 ± 0.019 | – | – | 3 |
+| surgical_phase | ds_multitask_vq (joint) | 137.000 | macro_f1 0.118 ± 0.026 | – | – | 3 |
 
 ### Image codebook size (5 epochs)
 

@@ -5,6 +5,9 @@
     # run the four plans of configs/rerun_gpu/ in parallel, then pull the results back
     modal run scripts/modal_rerun.py::rerun
     python scripts/modal_rerun.py merge          # untar logs/modal_results/*.tar over experiments/
+    # downstream-only re-run on the existing tokenizers, then merge just those results
+    modal run scripts/modal_rerun.py::rerun --only ds_image,ds_mortality,ds_phase
+    python scripts/modal_rerun.py merge ds_image ds_mortality ds_phase
 
 Each job unpacks data + experiments onto the container's local disk, runs one plan with
 `medical_tokenizer.pipeline`, and writes a tarball of every file it created or changed
@@ -21,7 +24,8 @@ import modal
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 VOL = modal.Volume.from_name("medtok", create_if_missing=True)
-JOBS = {"image": "gpu", "mortality": "gpu", "phase": "gpu", "evaluate": "cpu"}   # plan -> container kind
+JOBS = {"image": "gpu", "mortality": "gpu", "phase": "gpu", "evaluate": "cpu",   # plan -> container kind
+        "ds_image": "gpu", "ds_mortality": "gpu", "ds_phase": "gpu"}               # downstream-only (no tokenizer training)
 
 image = (
     modal.Image.debian_slim(python_version="3.12")
@@ -81,7 +85,7 @@ def upload():
 
 @app.local_entrypoint()
 def rerun(only: str = ""):
-    plans = [p for p in JOBS if not only or p in only.split(",")]
+    plans = [p for p in JOBS if p in only.split(",")] if only else [p for p in JOBS if not p.startswith("ds_")]
     calls = [(run_gpu if JOBS[p] == "gpu" else run_cpu).spawn(p) for p in plans]
     for p, c in zip(plans, calls):
         try:
@@ -99,14 +103,14 @@ def rerun(only: str = ""):
             print(f"{p}: no results ({type(e).__name__}: {e})", flush=True)
 
 
-def merge() -> None:
+def merge(plans: list[str] | None = None) -> None:
     d = os.path.join(ROOT, "logs", "modal_results")
-    for p in JOBS:
+    for p in plans or JOBS:
         f = os.path.join(d, f"{p}.tar")
         if os.path.exists(f):
             _sh(f"cd {ROOT} && tar -xf {f}")
             print("merged", p)
 
 
-if __name__ == "__main__" and sys.argv[1:] == ["merge"]:
-    merge()
+if __name__ == "__main__" and sys.argv[1:2] == ["merge"]:
+    merge(sys.argv[2:])          # e.g. `merge ds_image ds_mortality ds_phase`; no names = every plan

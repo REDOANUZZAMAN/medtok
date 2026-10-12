@@ -55,9 +55,10 @@ def run_downstream(cfg: dict) -> Run:
         tr = cfg.get("train", {})
         res = fit(model, data, tasks, epochs=tr.get("epochs", 20), batch_size=tr.get("batch_size", 64),
                   lr=tr.get("lr", 5e-4), weight_decay=tr.get("weight_decay", 0.01), patience=tr.get("patience", 5),
-                  seed=seed, log=lambda s: print(s, flush=True))
+                  class_weight=tr.get("class_weight"), threshold=tr.get("threshold"), seed=seed, log=lambda s: print(s, flush=True))
         run.log({"seed": seed, "test": res["test"], "best_val_score": res["best_val_score"],
-                 "epochs_run": res["epochs_run"], "params": res["params"]}, file="seeds.jsonl")
+                 "epochs_run": res["epochs_run"], "params": res["params"],
+                 "class_weight": res["class_weight"], "threshold": res["threshold"]}, file="seeds.jsonl")
         run.save_json(f"history_seed{seed}.json", res["history"])
         per_seed.append(res)
     agg = {}

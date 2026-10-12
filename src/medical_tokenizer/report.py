@@ -147,7 +147,8 @@ DS = [("bloodmnist", ["ds_bloodmnist_continuous", "ds_bloodmnist_vq"], ["auroc",
 def downstream_table(missing: list) -> Table:
     t = Table("Downstream tasks (test set, mean ± std over seeds)",
               ["task", "experiment", "seq len (train mean)", "metric 1", "metric 2", "metric 3", "seeds"],
-              "Fixed splits and an identical model / training budget per task. Images: AUROC and macro-F1; "
+              "Fixed splits and an identical model / training budget per task; class-weighted loss, binary-task "
+              "cut-off chosen on validation. Images: AUROC and macro-F1; "
               "ICU mortality: AUROC and AUPRC. Text in ds_mortality_event_text is synthetic (admission-time fields "
               "only, no outcome). Surgical phase uses Cataract-101 and is not comparable with Cholec80 results.")
     for task, names, keys in DS + [("multitask", ["ds_multitask_vq"], None)]:

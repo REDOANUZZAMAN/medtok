@@ -1,0 +1,6 @@
+# Downstream-only re-run (class-weighted loss): every surgical-phase run, same recipe as the other tasks.
+output_dir: experiments
+steps:
+  - {downstream: configs/downstream/phase_continuous.yaml}
+  - {downstream: configs/downstream/phase_vq.yaml}
+  - {downstream: configs/downstream/phase_segments.yaml}

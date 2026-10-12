@@ -43,11 +43,11 @@ def train(task_name: str, seed: int = 0) -> None:
     t0 = time.time()
     res = fit(model, data, {task_name: task}, epochs=tr.get("epochs", 20), batch_size=tr.get("batch_size", 64),
               lr=tr.get("lr", 5e-4), weight_decay=tr.get("weight_decay", 0.01), patience=tr.get("patience", 5),
-              seed=seed, log=lambda s: print(s, flush=True))
+              class_weight=tr.get("class_weight"), threshold=tr.get("threshold"), seed=seed, log=lambda s: print(s, flush=True))
     os.makedirs(OUT, exist_ok=True)
     path = os.path.join(OUT, f"{task_name}_vq.pt")
     torch.save({"cfg": model.cfg, "state": model.state_dict(), "test": res["test"][task_name], "seed": seed,
-                "epochs_run": res["epochs_run"], "config": cfg["_config_path"],
+                "threshold": res["threshold"][task_name], "epochs_run": res["epochs_run"], "config": cfg["_config_path"],
                 "tokenizer_run": entry["tokenizer_run"]}, path)
     m = res["test"][task_name]
     print(f"{task_name}: saved {path} | test auroc {m.get('auroc', float('nan')):.4f} macro_f1 {m['macro_f1']:.4f} "

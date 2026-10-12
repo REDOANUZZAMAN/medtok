@@ -279,7 +279,7 @@ function imageView(d, title) {
 function predView(d) {
   const p = d.prediction;
   if (!p) return `<div class="card muted">The classifier for this image type is not trained yet (run <code>scripts/train_demo_classifiers.py</code>).</div>`;
-  const top = p.probs[0], ok = d.label ? top.label === d.label : null;
+  const top = p.probs.find(r => r.label === p.predicted) || p.probs[0], ok = d.label ? top.label === d.label : null;
   return `<div class="card"><h3>Classifier: reading only the ${p.n_tokens} VQ tokens</h3>
     <div class="pred">
       <div class="pred-main">

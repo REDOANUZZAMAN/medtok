@@ -34,6 +34,9 @@ All three time-series representations carry the same discrete static block (age,
 3. **Downstream validation** (`python -m medical_tokenizer.downstream`). The same `UnifiedTokenTransformer` (d = 128, 2 pre-LN layers, 4 heads, 2.78 M parameters, of which 1.77 M are the 13,824 × 128 token embedding) is trained from scratch on the token shards:
    - AdamW 5e-4, one-cycle schedule, batch 32, up to 20 epochs;
    - early stopping on the validation metric (patience 5), best-validation checkpoint tested once;
+   - class-weighted cross-entropy: each class is weighted by n / (K · count) from the training labels, so rare classes (e.g. DermaMNIST melanoma, ICU deaths ≈ 14 %) count as much as common ones;
+   - binary tasks (PneumoniaMNIST, ICU mortality): the decision cut-off on P(positive) is the one that maximises balanced accuracy on the **validation** split, then applied unchanged to test. AUROC / AUPRC do not depend on it; accuracy, balanced accuracy and macro-F1 do. Multiclass tasks use argmax;
+   - both rules were approved by the supervisor on 2026-10-12 and apply to every representation alike;
    - training seconds per epoch are recorded as a cost measure (self-attention cost grows with the square of sequence length);
    - **3 seeds**, reported as mean ± std.
 

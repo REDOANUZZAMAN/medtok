@@ -38,12 +38,34 @@ TASKS = {
 }
 
 
-def metrics(task: DownstreamTask, y: np.ndarray, logits: np.ndarray) -> dict:
+def balanced_class_weight(y: np.ndarray, n_classes: int) -> list[float]:
+    """n / (K * count_c) from the training labels, so every class carries the same total loss
+    (sklearn's class_weight="balanced"). Classes absent from training get weight 0."""
+    counts = np.bincount(y, minlength=n_classes).astype(float)
+    return [len(y) / (n_classes * c) if c else 0.0 for c in counts]
+
+
+def pick_threshold(task: DownstreamTask, y: np.ndarray, logits: np.ndarray) -> float | None:
+    """Binary tasks: the P(class 1) cut-off that maximises balanced accuracy (Youden's J) on the given
+    split -- call it on validation, never on test. Multiclass tasks keep argmax (returns None)."""
+    if task.kind != "binary" or len(np.unique(y)) < 2:
+        return None
+    from sklearn.metrics import roc_curve
+    p1 = torch.softmax(torch.as_tensor(logits, dtype=torch.float32), -1).numpy()[:, 1]
+    fpr, tpr, thr = roc_curve(y, p1)
+    return float(min(thr[np.argmax(tpr - fpr)], 1.0))
+
+
+def metrics(task: DownstreamTask, y: np.ndarray, logits: np.ndarray, threshold: float | None = None) -> dict:
+    """Threshold-free metrics (AUROC, AUPRC) use the probabilities; acc / balanced_acc / macro_f1 use argmax,
+    or for binary tasks `P(class 1) >= threshold` when a (validation-chosen) threshold is given."""
     p = torch.softmax(torch.as_tensor(logits, dtype=torch.float32), -1).numpy()
-    pred = p.argmax(1)
+    pred = (p[:, 1] >= threshold).astype(int) if threshold is not None and task.kind == "binary" else p.argmax(1)
     out = {"acc": float((pred == y).mean()), "balanced_acc": float(balanced_accuracy_score(y, pred)),
            "macro_f1": float(f1_score(y, pred, average="macro", labels=np.arange(task.n_classes), zero_division=0)),
            "n": int(len(y))}
+    if threshold is not None and task.kind == "binary":
+        out["threshold"] = float(threshold)
     if task.kind == "binary":
         if len(np.unique(y)) == 2:
             out["auroc"] = float(roc_auc_score(y, p[:, 1]))

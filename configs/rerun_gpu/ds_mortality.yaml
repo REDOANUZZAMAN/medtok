@@ -1,0 +1,8 @@
+# Downstream-only re-run (class-weighted loss + validation threshold): every ICU-mortality run.
+output_dir: experiments
+steps:
+  - {downstream: configs/downstream/mortality_continuous.yaml}
+  - {downstream: configs/downstream/mortality_vq.yaml}
+  - {downstream: configs/downstream/mortality_event.yaml}
+  - {downstream: configs/downstream/mortality_event_change.yaml}
+  - {downstream: configs/downstream/mortality_event_text.yaml}

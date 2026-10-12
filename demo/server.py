@@ -142,7 +142,9 @@ def classify(x: np.ndarray, task: str) -> dict | None:
     seq = serialize(Sample("demo", [Segment("image", x)]), {"image": S.img["vq"]})
     with torch.no_grad():
         p = torch.softmax(m(collate([seq], None), task), -1)[0].numpy()
-    return {"task": task, "probs": [{"label": CLASSES[task][k], "p": float(p[k])} for k in np.argsort(-p)],
+    thr = ck.get("threshold")   # binary tasks: cut-off chosen on validation (same rule as the thesis runs)
+    top = int(p[1] >= thr) if thr is not None and len(p) == 2 else int(p.argmax())
+    return {"task": task, "predicted": CLASSES[task][top], "threshold": thr, "probs": [{"label": CLASSES[task][k], "p": float(p[k])} for k in np.argsort(-p)],
             "test": {k: ck["test"].get(k) for k in ("auroc", "macro_f1", "acc")}, "n_test": ck["test"].get("n"),
             "seed": ck["seed"], "n_tokens": len(seq)}
 

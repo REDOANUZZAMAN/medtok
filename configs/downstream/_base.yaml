@@ -15,3 +15,5 @@ train:
   lr: 5.0e-4
   weight_decay: 0.01
   patience: 5
+  class_weight: balanced     # inverse training-class frequency (supervisor-approved 2026-10-12)
+  threshold: val_balanced_acc   # binary tasks: cut-off chosen on validation, applied to test

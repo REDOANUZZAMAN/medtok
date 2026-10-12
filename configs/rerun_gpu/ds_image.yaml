@@ -1,0 +1,11 @@
+# Downstream-only re-run (class-weighted loss + validation threshold, approved 2026-10-12): every image
+# downstream run on the existing K=1024 tokenizers -- the tokenizers themselves are not retrained.
+output_dir: experiments
+steps:
+  - {downstream: configs/downstream/pneumoniamnist_vq.yaml}
+  - {downstream: configs/downstream/pneumoniamnist_continuous.yaml}
+  - {downstream: configs/downstream/bloodmnist_vq.yaml}
+  - {downstream: configs/downstream/bloodmnist_continuous.yaml}
+  - {downstream: configs/downstream/dermamnist_vq.yaml}
+  - {downstream: configs/downstream/dermamnist_continuous.yaml}
+  - {downstream: configs/downstream/multitask_vq.yaml}
