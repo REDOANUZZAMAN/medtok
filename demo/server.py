@@ -29,11 +29,13 @@ from medical_tokenizer.data import datasets as D                    # noqa: E402
 from medical_tokenizer.data.notes import note_fields, stay_note, template_source  # noqa: E402
 from medical_tokenizer.data.physionet import TS_VARS                # noqa: E402
 from medical_tokenizer.data.video import CATARACT101_PHASES         # noqa: E402
+from medical_tokenizer.downstream.dataset import collate            # noqa: E402
+from medical_tokenizer.downstream.model import UnifiedTokenTransformer  # noqa: E402
 from medical_tokenizer.evaluation.reconstruction import image_metrics  # noqa: E402
 from medical_tokenizer.protocol import split_spans, to_tokens       # noqa: E402
 from medical_tokenizer.protocol.schema import Sample, Segment       # noqa: E402
 from medical_tokenizer.protocol.serialize import serialize          # noqa: E402
-from medical_tokenizer.protocol.vocab import CONT, VOCAB_SIZE       # noqa: E402
+from medical_tokenizer.protocol.vocab import CONT, PROTOCOL_VERSION, VOCAB_SIZE  # noqa: E402
 from medical_tokenizer.tokenizers.timeseries.codec import stay_segment  # noqa: E402
 from medical_tokenizer.tokenizers.video.codec import AnnotatedPhaseEventCodec, make_clips  # noqa: E402
 from medical_tokenizer.protocol.vocab import RANGES                 # noqa: E402
@@ -114,15 +116,56 @@ def clean(o):
     return o
 
 
+_CLF: dict = {}
+
+
+def classifier(task: str):
+    """Demo classifier from scripts/train_demo_classifiers.py, reloaded when the checkpoint file changes."""
+    path = os.path.join(ROOT, "checkpoints", "demo", f"{task}_vq.pt")
+    if not os.path.exists(path):
+        return None
+    mt = os.path.getmtime(path)
+    if task not in _CLF or _CLF[task][0] != mt:
+        ck = torch.load(path, map_location="cpu", weights_only=False)
+        m = UnifiedTokenTransformer(**ck["cfg"])
+        m.load_state_dict(ck["state"])
+        _CLF[task] = (mt, m.eval(), ck)
+    return _CLF[task][1:]
+
+
+def classify(x: np.ndarray, task: str) -> dict | None:
+    """Image -> VQ token sequence (same serialisation as the training shards) -> class probabilities."""
+    c = classifier(task)
+    if c is None:
+        return None
+    m, ck = c
+    seq = serialize(Sample("demo", [Segment("image", x)]), {"image": S.img["vq"]})
+    with torch.no_grad():
+        p = torch.softmax(m(collate([seq], None), task), -1)[0].numpy()
+    return {"task": task, "probs": [{"label": CLASSES[task][k], "p": float(p[k])} for k in np.argsort(-p)],
+            "test": {k: ck["test"].get(k) for k in ("auroc", "macro_f1", "acc")}, "n_test": ck["test"].get("n"),
+            "seed": ck["seed"], "n_tokens": len(seq)}
+
+
+def read_image(data: str, task: str | None = None) -> np.ndarray:
+    """Base64 / data-URL picture -> centre square -> 28x28 RGB (grey replicated for the chest X-ray task)."""
+    im = Image.open(io.BytesIO(base64.b64decode(data.split(",", 1)[-1])))
+    im = im.convert("L").convert("RGB") if task == "pneumoniamnist" else im.convert("RGB")
+    w, h = im.size
+    s = min(w, h)
+    im = im.crop(((w - s) // 2, (h - s) // 2, (w - s) // 2 + s, (h - s) // 2 + s)).resize((28, 28), Image.LANCZOS)
+    return np.asarray(im, np.uint8)
+
+
 # ------------------------------------------------------------------ endpoints
 def api_info(q):
     return {"image_counts": {s: len(v[0]) for s, v in S.images.items()}, "n_stays": len(S.stays),
             "videos": sorted(S.videos), "image_codebook": S.k_img, "vocab_size": VOCAB_SIZE}
 
 
-def _image_payload(x: np.ndarray, label: str | None):
+def _image_payload(x: np.ndarray, label: str | None, task: str | None = None):
     seg = Segment("image", x)
-    out = {"label": label, "original": png(x, 6)}
+    out = {"label": label, "original": png(x, 6), "prediction": classify(x, task) if task else None}
     for rep, codec in S.img.items():
         span = codec.encode(seg)
         rec = codec.decode(span)
@@ -140,18 +183,14 @@ def api_image(q):
     sub = q.get("subset", "bloodmnist")
     x, y = S.images[sub]
     i = int(q.get("i", np.random.randint(len(x)))) % len(x)
-    out = _image_payload(x[i], CLASSES[sub][int(y[i])])
+    out = _image_payload(x[i], CLASSES[sub][int(y[i])], sub)
     out.update(subset=sub, index=i)
     return out
 
 
 def api_image_upload(body):
-    raw = base64.b64decode(body["png"].split(",", 1)[-1])
-    im = Image.open(io.BytesIO(raw)).convert("RGB")
-    w, h = im.size
-    s = min(w, h)
-    im = im.crop(((w - s) // 2, (h - s) // 2, (w - s) // 2 + s, (h - s) // 2 + s)).resize((28, 28), Image.LANCZOS)
-    return _image_payload(np.asarray(im, np.uint8), None)
+    task = body.get("task") if body.get("task") in CLASSES else None
+    return _image_payload(read_image(body["png"], task), None, task)
 
 
 def api_icu(q):
@@ -249,9 +288,60 @@ def api_results(q):
     return {"markdown": open(p).read() if os.path.exists(p) else "(no report yet)"}
 
 
-GET = {"/api/info": api_info, "/api/image": api_image, "/api/icu": api_icu, "/api/text": api_text,
+# ------------------------------------------------------------------ public JSON API (v1)
+def v1_index(q):
+    return {"name": "MedTok API", "protocol_version": PROTOCOL_VERSION, "vocab_size": VOCAB_SIZE,
+            "image_codebook": S.k_img, "classify_tasks": {t: CLASSES[t] for t in CLASSES if classifier(t)},
+            "endpoints": {"GET /api/v1": "this index",
+                          "POST /api/v1/tokenize/image": "{image: base64 PNG/JPEG, rep?: vq|continuous}",
+                          "POST /api/v1/tokenize/text": "{text: string}",
+                          "POST /api/v1/classify/image": "{image: base64 PNG/JPEG, task: bloodmnist|pneumoniamnist|dermamnist}"}}
+
+
+def v1_tokenize_image(body):
+    rep = body.get("rep", "vq")
+    if rep not in S.img:
+        raise ValueError("rep must be 'vq' or 'continuous'")
+    x = read_image(body["image"], body.get("task"))
+    codec = S.img[rep]
+    seg = Segment("image", x)
+    seq = serialize(Sample(body.get("sample_id", "api"), [seg]), {"image": codec})
+    toks = to_tokens(seq, S.lex, S.text.piece)
+    rec = codec.decode(codec.encode(seg))
+    m = image_metrics(x[None], rec[None], ssim=True)
+    return {"rep": rep, "ids": [int(t) for t in seq.ids], "n_tokens": len(toks),
+            "tokens": [{"id": t.token_id, "token": t.token, "type": t.token_type.value} for t in toks],
+            "jsonl": [json.dumps({"id": t.token_id, "token": t.token, "type": t.token_type.value,
+                                  "modality": t.modality, "t_min": t.timestamp_min, "pos": t.position}, default=str)
+                      for t in toks],
+            "reconstruction": {"png": png(rec), "psnr_db": m["psnr_db"], "ssim": m["ssim"]},
+            **{k: v for k, v in bits_summary(codec, seg, codec.encode(seg)).items() if k != "positions"}}
+
+
+def v1_tokenize_text(body):
+    text = str(body["text"])
+    if len(text) > 20000:
+        raise ValueError("text longer than 20,000 characters")
+    span = S.text.encode(Segment("text", text))
+    dec = S.text.decode(span)
+    return {"ids": [int(t) for t in span.ids], "pieces": [S.text.piece(RANGES["text"].to_local(int(t))) for t in span.ids],
+            "n_tokens": len(span.ids), "decoded": dec, "exact_roundtrip": dec == text}
+
+
+def v1_classify_image(body):
+    task = body.get("task", "bloodmnist")
+    if task not in CLASSES:
+        raise ValueError(f"task must be one of {list(CLASSES)}")
+    out = classify(read_image(body["image"], task), task)
+    if out is None:
+        raise ValueError(f"no demo classifier for {task}; run scripts/train_demo_classifiers.py")
+    return {**out, "disclaimer": "research demo on 28x28 MedMNIST-style images; not a medical device"}
+
+
+GET = {"/api/v1": v1_index, "/api/info": api_info, "/api/image": api_image, "/api/icu": api_icu, "/api/text": api_text,
        "/api/video": api_video, "/api/sequence": api_sequence, "/api/results": api_results}
-POST = {"/api/image_upload": api_image_upload}
+POST = {"/api/image_upload": api_image_upload, "/api/v1/tokenize/image": v1_tokenize_image,
+        "/api/v1/tokenize/text": v1_tokenize_text, "/api/v1/classify/image": v1_classify_image}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -275,6 +365,13 @@ class Handler(BaseHTTPRequestHandler):
         if u.path in ("/", "/index.html"):
             with open(os.path.join(ROOT, "demo", "index.html"), "rb") as f:
                 return self._send(200, f.read(), "text/html; charset=utf-8")
+        if u.path.startswith("/media/"):                         # walkthrough video (demo/record_walkthrough.js)
+            name = os.path.basename(u.path)
+            f = os.path.join(ROOT, "demo", "media", name)
+            types = {".mp4": "video/mp4", ".webm": "video/webm"}
+            if os.path.splitext(name)[1] in types and os.path.isfile(f):
+                with open(f, "rb") as fh:
+                    return self._send(200, fh.read(), types[os.path.splitext(name)[1]])
         self._send(404, b"not found", "text/plain")
 
     def do_POST(self):

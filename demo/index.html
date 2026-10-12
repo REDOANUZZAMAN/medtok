@@ -108,6 +108,20 @@
   .loading::before { content:""; width:18px; height:18px; border:2.5px solid #cbd5e1; border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; }
   @keyframes spin { to { transform:rotate(360deg); } }
 
+  .pred { display:grid; grid-template-columns:260px 1fr; gap:28px; align-items:center; }
+  .pred-label { font-size:24px; font-weight:700; text-transform:capitalize; color:var(--accent2); margin:2px 0; }
+  .bars { display:flex; flex-direction:column; gap:7px; }
+  .bar { display:grid; grid-template-columns:170px 1fr 56px; gap:10px; align-items:center; font-size:13px; }
+  .bar span { text-transform:capitalize; color:#334155; } .bar b { text-align:right; font-weight:600; }
+  .bar div { height:10px; background:#f1f5f9; border-radius:5px; overflow:hidden; }
+  .bar i { display:block; height:100%; background:linear-gradient(90deg,#14b8a6,#0f766e); border-radius:5px; }
+  .ep { border:1px solid var(--line); border-radius:10px; margin-bottom:14px; overflow:hidden; }
+  .ep-h { display:flex; gap:10px; align-items:center; padding:10px 14px; background:#f8fafc; border-bottom:1px solid var(--line); }
+  .verb { font:700 11px ui-monospace,monospace; padding:3px 7px; border-radius:5px; color:#fff; }
+  .verb.get { background:#2563eb; } .verb.post { background:#0f766e; }
+  .ep-b { padding:12px 14px; } .ep-b pre { margin:8px 0 0; }
+  .try { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+
   /* ---- overview page ---- */
   .hero { background:linear-gradient(135deg,#0b1324 0%,#123b3a 100%); color:#e2e8f0; border-radius:16px; padding:34px 36px; margin-bottom:22px; position:relative; overflow:hidden; }
   .hero::after { content:""; position:absolute; right:-80px; top:-80px; width:320px; height:320px; border-radius:50%; background:radial-gradient(circle,rgba(20,184,166,.35),transparent 70%); }
@@ -133,6 +147,10 @@
   .tri .tag { display:table; font-size:11px; font-weight:700; padding:2px 8px; border-radius:5px; margin-bottom:8px; }
   .tri p { margin:4px 0 0; font-size:13px; color:var(--ink2); }
 
+  @media (max-height: 820px) and (min-width: 961px) {
+    .side-foot { display:none; } .brand { padding-bottom:14px; margin-bottom:8px; }
+    nav .grp { padding:10px 12px 4px; } nav button { padding:7px 12px; }
+  }
   @media (max-width: 960px) {
     .app { grid-template-columns:minmax(0,1fr); background:var(--bg); }
     aside { min-width:0; }
@@ -142,7 +160,7 @@
     nav { flex-direction:row; overflow-x:auto; } nav .grp, .side-foot { display:none; }
     nav button { white-space:nowrap; }
     .topbar, main { padding-left:18px; padding-right:18px; }
-    .pipe, .tri { grid-template-columns:1fr; } .pipe .step { margin:0 0 10px; } .pipe .step::after { display:none; }
+    .pipe, .tri, .pred { grid-template-columns:1fr; } .bar { grid-template-columns:110px 1fr 50px; } .pipe .step { margin:0 0 10px; } .pipe .step::after { display:none; }
   }
 </style>
 </head>
@@ -168,7 +186,8 @@ const TABS = [
   ["video", "Surgical video", "Surgical video · Cataract-101", I('<rect x="2" y="6" width="14" height="12" rx="2"/><path d="M22 8l-6 4 6 4z"/>'), "Modalities"],
   ["text", "Clinical text", "Clinical text · synthetic notes", I('<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h6"/>'), "Modalities"],
   ["seq", "Shared sequence", "Unified token sequence · JSONL", I('<path d="M4 6h16M4 12h10M4 18h13"/>'), "Protocol"],
-  ["results", "Results", "Evaluation results", I('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'), "Evaluation"]];
+  ["results", "Results", "Evaluation results", I('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'), "Evaluation"],
+  ["api", "Developer API", "Developer API · Python toolkit", I('<path d="M8 6l-6 6 6 6M16 6l6 6-6 6"/>'), "Developers"]];
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
 const f = (x, d=2) => x == null ? "–" : (Math.abs(x) >= 1000 ? Math.round(x).toLocaleString() : Number(x).toFixed(d));
@@ -254,7 +273,25 @@ function imageView(d, title) {
     <p class="muted">“Smaller by” = raw bits ÷ token bits. Above 1 means the tokens take less space than the pixels. The continuous version
       keeps 16-bit decimals, so it is often <i>bigger</i> than the picture — that is why it is only a baseline.</p>
     <details><summary>Show the actual token sequence</summary><div class="toks" style="margin-top:8px">${tokSpans(v.tokens)}</div></details>
-  </div>`;
+  </div>
+  ${predView(d)}`;
+}
+function predView(d) {
+  const p = d.prediction;
+  if (!p) return `<div class="card muted">The classifier for this image type is not trained yet (run <code>scripts/train_demo_classifiers.py</code>).</div>`;
+  const top = p.probs[0], ok = d.label ? top.label === d.label : null;
+  return `<div class="card"><h3>Classifier: reading only the ${p.n_tokens} VQ tokens</h3>
+    <div class="pred">
+      <div class="pred-main">
+        <div class="muted">Model prediction</div><div class="pred-label">${esc(top.label)}</div>
+        <div class="muted">${(top.p * 100).toFixed(1)}% confidence${d.label ? ` · true label: <b>${esc(d.label)}</b> ${ok ? '<span class="ok">✓ correct</span>' : '<span class="bad">✗ wrong</span>'}` : ""}</div>
+      </div>
+      <div class="bars">${p.probs.map(r => `<div class="bar"><span>${esc(r.label)}</span><div><i style="width:${Math.max(r.p * 100, 0.5)}%"></i></div><b>${(r.p * 100).toFixed(1)}%</b></div>`).join("")}</div>
+    </div>
+    <p class="muted" style="margin-bottom:0">The model never sees the pixels: the picture becomes ${p.n_tokens} tokens, and a small Transformer
+      (the same model and training budget as the thesis experiment, one seed) reads only those numbers. On the
+      ${p.n_test ? p.n_test.toLocaleString() : ""} test images this demo model scores AUROC ${f(p.test.auroc, 3)} and macro-F1 ${f(p.test.macro_f1, 3)}.
+      The thesis reports the 3-seed mean on the Results page. <b>Research demo only, not a medical diagnosis.</b></p></div>`;
 }
 async function image(sub = "bloodmnist", i) {
   loading();
@@ -280,8 +317,8 @@ async function image(sub = "bloodmnist", i) {
       const rd = new FileReader();
       rd.onload = async () => {
         $("#imgview").innerHTML = `<div class="card muted">Tokenizing your picture…</div>`;
-        try { const u = await api("/api/image_upload", {png: rd.result});
-              $("#imgview").innerHTML = imageView(u, "Your picture (cropped to a square, shrunk to 28×28)"); }
+        try { const u = await api("/api/image_upload", {png: rd.result, task: $("#sub").value});
+              $("#imgview").innerHTML = imageView(u, `Your picture (cropped to a square, shrunk to 28×28, classified as a ${$("#sub").selectedOptions[0].text.toLowerCase()} image)`); }
         catch (err) { $("#imgview").innerHTML = `<div class="card err">${esc(err.message)}</div>`; }
       };
       rd.readAsDataURL(file);
@@ -449,8 +486,76 @@ async function results() {
   } catch (e) { fail(e); }
 }
 
+// ---------------------------------------------------------------- developer API
+async function apiPage() {
+  loading();
+  try {
+    const d = await api("/api/v1");
+    const host = location.origin;
+    const ep = (verb, path, desc, body) => `<div class="ep"><div class="ep-h"><span class="verb ${verb.toLowerCase()}">${verb}</span>
+      <code>${path}</code><span class="muted">${desc}</span></div>${body ? `<div class="ep-b">${body}</div>` : ""}</div>`;
+    $("#main").innerHTML = `
+    <div class="explain"><b>What am I looking at?</b> Other programs can use the tokenizer too. This server has a small
+      <b>JSON API</b> (send data, get tokens back), and the project is a <b>Python package</b> you can install and call from code.
+      Same tokenizer, same ${d.vocab_size.toLocaleString()}-token vocabulary, protocol v${esc(d.protocol_version)}.</div>
+    <div class="card"><h3>Try it: upload a picture and call the API</h3>
+      <div class="try">
+        <select id="ttask">${Object.keys(d.classify_tasks).map(t => `<option value="${t}">${t}</option>`).join("") || '<option value="bloodmnist">bloodmnist</option>'}</select>
+        <label class="act" style="padding:0 14px;border:1px solid #cbd5e1;border-radius:8px;cursor:pointer;background:#fff">Choose picture<input type="file" id="tfile" accept="image/*" hidden></label>
+        <button class="act primary" id="tgo1">POST /tokenize/image</button><button class="act" id="tgo2">POST /classify/image</button>
+        <span class="muted" id="tname">no file chosen</span></div>
+      <pre id="tout" style="max-height:340px">// the JSON response will appear here</pre></div>
+    <div class="card"><h3>Endpoints</h3>
+      ${ep("GET", "/api/v1", "service info, vocabulary size, available classifiers")}
+      ${ep("POST", "/api/v1/tokenize/image", "picture → token ids, readable tokens, JSONL lines, reconstruction and compression",
+        `<pre>curl -s ${host}/api/v1/tokenize/image \\
+  -H 'Content-Type: application/json' \\
+  -d "{\\"image\\": \\"$(base64 -w0 cell.png)\\", \\"rep\\": \\"vq\\"}"</pre>`)}
+      ${ep("POST", "/api/v1/classify/image", "picture → class probabilities from the token-only classifier",
+        `<pre>curl -s ${host}/api/v1/classify/image \\
+  -H 'Content-Type: application/json' \\
+  -d "{\\"image\\": \\"$(base64 -w0 xray.png)\\", \\"task\\": \\"pneumoniamnist\\"}"</pre>`)}
+      ${ep("POST", "/api/v1/tokenize/text", "text → sub-word token ids and pieces, with an exact round-trip check",
+        `<pre>curl -s ${host}/api/v1/tokenize/text -H 'Content-Type: application/json' \\
+  -d '{"text": "HR 92 bpm at 01:00, no fever."}'</pre>`)}
+      <p class="muted" style="margin-bottom:0">Pictures are cut to a centre square and shrunk to 28×28 like MedMNIST. Classify tasks: ${Object.keys(d.classify_tasks).map(esc).join(", ") || "none trained yet"}.
+        Research prototype: no authentication or rate limits, do not send patient data.</p></div>
+    <div class="card"><h3>Python package</h3>
+      <p>Install from the project repository (PyTorch first, CPU build is enough):</p>
+      <pre>pip install torch --index-url https://download.pytorch.org/whl/cpu
+pip install "git+https://github.com/REDOANUZZAMAN/medtok.git"</pre>
+      <p>Then tokenize an image and write the protocol file:</p>
+      <pre>from medical_tokenizer.toolkit import load_tokenizer, MultimodalCodec
+from medical_tokenizer.protocol import Sample, Segment, to_tokens, write_jsonl
+
+image = load_tokenizer("experiments/image_vq/latest")      # a trained tokenizer run
+codec = MultimodalCodec({"image": image})
+seq   = codec.encode(Sample("cell-001", [Segment("image", picture_28x28_rgb)]))
+print(len(seq), seq.ids[:10])                              # token ids in the shared vocabulary
+back  = codec.decode(seq)                                  # [("image", reconstructed picture)]</pre>
+      <p class="muted" style="margin-bottom:0">Trained tokenizer weights are not inside the package (they are experiment outputs);
+        train them with <code>scripts/run_all.sh</code> or use this API.</p></div>`;
+    let file = null;
+    $("#tfile").onchange = e => { const f0 = e.target.files[0]; if (!f0) return; const rd = new FileReader();
+      rd.onload = () => { file = rd.result; $("#tname").textContent = f0.name; }; rd.readAsDataURL(f0); };
+    const call = async (path, extra) => {
+      if (!file) { $("#tout").textContent = "// choose a picture first"; return; }
+      $("#tout").textContent = "// calling " + path + " …";
+      try {
+        const j = await api(path, {image: file, task: $("#ttask").value, ...extra});
+        if (j.reconstruction) j.reconstruction.png = j.reconstruction.png.slice(0, 48) + "…";
+        if (j.jsonl) j.jsonl = j.jsonl.slice(0, 4).concat([`… ${j.jsonl.length - 4} more lines`]);
+        if (j.tokens) j.tokens = j.tokens.slice(0, 8).concat([`… ${j.tokens.length - 8} more`]);
+        $("#tout").textContent = JSON.stringify(j, null, 2);
+      } catch (e) { $("#tout").textContent = "// error: " + e.message; }
+    };
+    $("#tgo1").onclick = () => call("/api/v1/tokenize/image", {rep: "vq"});
+    $("#tgo2").onclick = () => call("/api/v1/classify/image", {});
+  } catch (e) { fail(e); }
+}
+
 // ---------------------------------------------------------------- nav
-const VIEWS = {start, image: () => image(), icu: () => icu(), video: () => video(), text: () => text(), seq: () => seq(), results};
+const VIEWS = {start, image: () => image(), icu: () => icu(), video: () => video(), text: () => text(), seq: () => seq(), results, api: apiPage};
 function show(tab) {
   if (!VIEWS[tab]) tab = "start";
   const t = TABS.find(x => x[0] === tab);

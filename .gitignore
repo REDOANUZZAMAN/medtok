@@ -14,6 +14,9 @@ checkpoints/
 __pycache__/
 *.pyc
 *.egg-info/
+build/
 .pytest_cache/
 .ipynb_checkpoints/
 logs/
+# demo walkthrough video (regenerate with node demo/record_walkthrough.js)
+demo/media/

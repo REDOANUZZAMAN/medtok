@@ -61,6 +61,14 @@ A browser demo (standard library server + one HTML page, `demo/`). It shows, on 
 turned into tokens and decoded again (images, ICU charts, surgery video and phase events, synthetic text), one
 mixed text + time-series token sequence with its JSONL form, and `reports/RESULTS.md`. You can also upload your own picture.
 
+- **Token-only classifier.** `scripts/train_demo_classifiers.py` repeats the `ds_<task>_vq` setup for one seed and saves
+  `checkpoints/demo/<task>_vq.pt`; the Images page then shows the class the model predicts from the VQ tokens alone.
+  The thesis numbers stay the 3-seed results in `reports/`. Research demo only, not a medical device.
+- **JSON API** (documented on the *Developer API* page): `GET /api/v1`, `POST /api/v1/tokenize/image`,
+  `POST /api/v1/classify/image`, `POST /api/v1/tokenize/text`.
+- **Walkthrough video.** `node demo/record_walkthrough.js` records a captioned tour of every page to
+  `demo/media/walkthrough.webm` (served at `/media/…`; needs playwright-core and Chromium).
+
 ## GPU re-runs on Modal (optional)
 
 Training loops use CUDA when available (`MEDTOK_DEVICE` overrides). `scripts/modal_rerun.py` runs the plans in
