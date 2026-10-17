@@ -480,6 +480,46 @@ def run_validation(cfg: dict) -> Run:
     return run
 
 
+# ------------------------------------------------------------------ reload a finished run (demo)
+def load_mimic(run: str = "experiments/mimic_validation/latest") -> SimpleNamespace:
+    """Cohort + the run's trained codecs, rebuilt for inspection (the password-protected demo tab).
+
+    Lab value bins are not saved by the run; they are refitted on the same training split, which is
+    deterministic, so the codec is identical to the one the run used."""
+    from .utils.experiment import load_run_config, resolve_run
+    run_dir = resolve_run(run)
+    cfg = load_run_config(run_dir)
+    d = cfg["data"]
+    root = abspath(d["root"])
+    pats = M.load_cohort(root, d.get("split_seed", 0), d.get("horizon_days", 365))
+    vocab = M.lab_vocabulary(root, pats, d.get("lab_top_k", 40))
+    M.attach_labs(root, pats, vocab)
+    lab_vars = [n for _, n in vocab]
+    lex = Lexicon.load(os.path.join(run_dir, "lexicon.json"))
+
+    def ckpt(name, cls):
+        ck = torch.load(os.path.join(run_dir, name), map_location="cpu", weights_only=False)
+        model = cls(**ck["cfg"])
+        model.load_state_dict(ck["state"])
+        return model.eval()
+
+    size, hz = cfg["image"]["unified_size"], cfg["ecg"]["hz"]
+    image = ImageVQCodec(ckpt(f"image_vq_{size}.pt", ImageAutoencoder))
+    ecg_model = ckpt("ecg_vq.pt", TimeSeriesWindowAutoencoder)
+    with open(os.path.join(run_dir, "ecg_normalizer.json")) as f:
+        import json
+        norm = Normalizer.from_json(json.load(f))
+    ecg = TSVQCodec(lex, ValueBinner(cfg["labs"]["n_value_bins"]), GridSpec(ecg_model.steps, 1.0 / hz / 60, ECG_VARS, []),
+                    ecg_model, norm)
+    labs, _ = labs_codec(cfg, pats, lex, lab_vars, cfg["labs"]["unified_resolution_min"])
+    text = ClinicalTextTokenizer.load(os.path.join(run_dir, f"text_bpe_mimic_{cfg['text']['unified_vocab']}.json"))
+    mc = MultimodalCodec({"text": text, "image": image,
+                          "timeseries": RoutedCodec({SRC["labs"]: labs, SRC["ecg"]: ecg})})
+    return SimpleNamespace(run_dir=run_dir, cfg=cfg, pats=pats, lab_vars=lab_vars, lex=lex, image=image, ecg=ecg,
+                           labs=labs, text=text, mc=mc, pretrained=load_tokenizer(cfg["image"]["pretrained"]),
+                           size=size, hz=hz)
+
+
 # ------------------------------------------------------------------ report (aggregates only)
 def _f(x, nd=3):
     return "-" if x is None else f"{x:,.{nd}f}" if isinstance(x, float) else f"{x:,}" if isinstance(x, int) else str(x)
