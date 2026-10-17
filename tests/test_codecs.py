@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 import torch
 
-from medical_tokenizer.codecs.base import MultimodalCodec
+from medical_tokenizer.codecs.base import MultimodalCodec, RoutedCodec
 from medical_tokenizer.data.video import CATARACT101_PHASES, phase_at, synthetic_video
 from medical_tokenizer.encoders.base import load_model, save_model
 from medical_tokenizer.encoders.image import ImageAutoencoder
@@ -14,10 +14,10 @@ from medical_tokenizer.evaluation.reconstruction import image_metrics, masked_ts
 from medical_tokenizer.positional_encoding.unified import UnifiedPositionalEncoding
 from medical_tokenizer.protocol.schema import Sample, Segment
 from medical_tokenizer.protocol.serialize import validate
-from medical_tokenizer.protocol.vocab import CONT, RANGES, SPECIAL
+from medical_tokenizer.protocol.vocab import CONT, RANGES, SPECIAL, dt_chain, dt_token
 from medical_tokenizer.tokenizers.image.codec import ImageContinuousCodec, ImageVQCodec, extract_patches
 from medical_tokenizer.tokenizers.pointcloud.codec import PointCloudTokenizer, chamfer, synthetic_surface
-from medical_tokenizer.tokenizers.timeseries.codec import (TSContinuousCodec, TSEventCodec, TSVQCodec,
+from medical_tokenizer.tokenizers.timeseries.codec import (GridSpec, TSContinuousCodec, TSEventCodec, TSVQCodec,
                                                            stay_segment)
 from medical_tokenizer.tokenizers.video.codec import (AnnotatedPhaseEventCodec, VideoContinuousCodec,
                                                       VideoSegmentCodec, VideoVQCodec, make_clips)
@@ -90,6 +90,19 @@ def test_ts_event_change_mode_is_shorter_and_same_on_observed(stays, lex, binner
         assert len(b.ids) <= len(a.ids)
         _, m = spec.grid(s.obs)
         np.testing.assert_allclose(chg_c.decode(b)["grid"][m], obs_c.decode(a)["grid"][m])
+
+
+@pytest.mark.parametrize("res", [60.0, 360.0, 1440.0])
+def test_ts_event_long_gaps_keep_exact_time(lex, binner, res):
+    """7-day windows (MIMIC-IV labs): gaps over 48 h must not land in the inexact log-spaced <DT> buckets."""
+    spec7 = GridSpec(int(7 * 24 * 60 // res), res)
+    hr = spec7.variables.index("HR")
+    obs = np.array([[0.5 * res, hr, 80], [(spec7.steps - 1 + 0.5) * res, hr, 90]], np.float32)  # gap ~ 7 days
+    ev = TSEventCodec(lex, binner, spec7)
+    span = ev.encode(Segment("timeseries", {"obs": obs, "static": {}}))
+    np.testing.assert_array_equal(ev.decode(span)["mask"], spec7.grid(obs)[1])
+    assert sum(int(i) in RANGES["dt"] for i in span.ids) > 1
+    assert dt_chain(30.0, 60.0) == [dt_token(30.0)] and len(dt_chain(5 * 24 * 60.0, 60.0)) == 3
 
 
 def test_ts_event_time_order_preserved(stays, lex, binner, spec):
@@ -269,6 +282,25 @@ def test_multimodal_sample_to_tokens_and_back(stays, lex, binner, spec, norm, te
     assert out["timeseries"]["grid"].shape == (48, 37)
     assert out["video"]["frames"].shape == frames.shape
     assert out["pointcloud"].shape == pts.shape
+
+
+def test_routed_codec_two_sources_one_modality(stays, lex, binner, spec, norm):
+    """Two time-series sources in one sample (MIMIC-IV: ECG waveform + lab events), each with its own codec."""
+    ts_m = TimeSeriesWindowAutoencoder(steps=48, window=4, groups=2, dim=4, hidden=32, quantizer=VQ).eval()
+    routed = RoutedCodec({"physionet2012": TSVQCodec(lex, binner, spec, ts_m, norm),
+                          "labs": TSEventCodec(lex, binner, spec)})
+    a = stay_segment(stays[0])
+    b = Segment("timeseries", a.data, 30.0, "labs")
+    seq = MultimodalCodec({"timeseries": routed}).encode(Sample("case-2", [b, a]))
+    validate(seq)
+    assert [(sp["rep"], sp["meta"]["source"]) for sp in seq.spans] == [("vq", "physionet2012"), ("event", "labs")]
+    out = MultimodalCodec({"timeseries": routed}).decode(seq)
+    assert out[0][1]["mask"] is None and out[1][1]["mask"].shape == (48, 37)
+    with pytest.raises(KeyError):
+        routed.encode(Segment("timeseries", a.data, 0.0, "unknown"))
+    with pytest.raises(ValueError):
+        RoutedCodec({"a": TSEventCodec(lex, binner, spec), "b": ImageVQCodec(
+            ImageAutoencoder(dim=8, hidden=16, quantizer=VQ))})
 
 
 def test_image_raw_bits_grayscale_counts_one_channel():

@@ -1,0 +1,483 @@
+{
+ "cohort": {
+  "patients": 600,
+  "split": {
+   "train": 419,
+   "val": 89,
+   "test": 92
+  },
+  "deaths_1y": 90,
+  "prevalence_1y": 0.15,
+  "deaths_1y_by_split": {
+   "train": 62,
+   "val": 13,
+   "test": 15
+  },
+  "images": 1083,
+  "images_per_patient": {
+   "mean": 1.805,
+   "sd": 0.6539784499673539
+  },
+  "patients_without_frontal_view": 15,
+  "ecgs": 848,
+  "ecgs_per_patient": {
+   "mean": 1.4133333333333333,
+   "sd": 0.9886613716207963
+  },
+  "lab_variables": 40,
+  "lab_results_per_patient_median": 29.5,
+  "patients_without_labs": 6,
+  "reports": 600,
+  "report_chars_median": 533.5,
+  "age_median": 65.0,
+  "male_fraction": 0.49666666666666665
+ },
+ "lab_variables": [
+  "lab:Sodium",
+  "lab:Potassium",
+  "lab:Chloride",
+  "lab:Creatinine",
+  "lab:Urea Nitrogen",
+  "lab:Bicarbonate",
+  "lab:Anion Gap",
+  "lab:Hematocrit",
+  "lab:Glucose",
+  "lab:Platelet Count",
+  "lab:Hemoglobin",
+  "lab:White Blood Cells",
+  "lab:MCH",
+  "lab:MCHC",
+  "lab:MCV",
+  "lab:RDW",
+  "lab:Red Blood Cells",
+  "lab:Magnesium",
+  "lab:Calcium, Total",
+  "lab:Phosphate",
+  "lab:PTT",
+  "lab:INR(PT)",
+  "lab:PT",
+  "lab:Basophils",
+  "lab:Eosinophils",
+  "lab:Lymphocytes",
+  "lab:Monocytes",
+  "lab:Neutrophils",
+  "lab:RDW-SD",
+  "lab:Lactate",
+  "lab:pH",
+  "lab:Base Excess",
+  "lab:Calculated Total CO2",
+  "lab:pCO2",
+  "lab:pO2",
+  "lab:Alanine Aminotransferase (ALT)",
+  "lab:Asparate Aminotransferase (AST)",
+  "lab:Alkaline Phosphatase",
+  "lab:Bilirubin, Total",
+  "lab:pH [51491]"
+ ],
+ "text": {
+  "synthetic_template_bpe": {
+   "vocab": 972,
+   "exact_roundtrip": 1.0,
+   "tokens_per_report": {
+    "mean": 379.1630434782609,
+    "sd": 131.99835806287436
+   },
+   "tokens_per_word": 4.719659044784197,
+   "chars_per_token": 1.567984405011037,
+   "compression_ratio_vs_utf8": 1.2638903994942963
+  },
+  "mimic_bpe_1024": {
+   "vocab": 1024,
+   "exact_roundtrip": 1.0,
+   "tokens_per_report": {
+    "mean": 166.25,
+    "sd": 71.29625932267831
+   },
+   "tokens_per_word": 2.069408740359897,
+   "chars_per_token": 3.576070611310886,
+   "compression_ratio_vs_utf8": 2.8608564890487087
+  },
+  "mimic_bpe_4096": {
+   "vocab": 4096,
+   "exact_roundtrip": 1.0,
+   "tokens_per_report": {
+    "mean": 124.05434782608695,
+    "sd": 44.09389684673419
+   },
+   "tokens_per_word": 1.5441753483966987,
+   "chars_per_token": 4.792429685446421,
+   "compression_ratio_vs_utf8": 3.194953123630947
+  },
+  "n_train_reports": 419,
+  "n_test_reports": 92
+ },
+ "labs": {
+  "res_60min": {
+   "steps": 168,
+   "compression": {
+    "n_samples": 92,
+    "raw_bits_per_sample": 3821.478260869565,
+    "token_bits_per_sample": 1233.3880472297271,
+    "compression_ratio": 3.098358435897659,
+    "tokens_per_sample_mean": 144.83695652173913,
+    "tokens_per_sample_median": 69.5,
+    "tokens_per_sample_max": 903,
+    "protocol_overhead_bits_per_sample": 154.0,
+    "compression_ratio_with_overhead": 2.754440813080463,
+    "discrete_tokens_per_sample": 144.83695652173913,
+    "continuous_vectors_per_sample": 0.0,
+    "raw_elements_per_sample": 67.09782608695652,
+    "sequence_reduction": 0.4632645403377111
+   },
+   "mae_z_observed_cells": 0.1365571767091751,
+   "observation_mask_preserved": 1.0,
+   "reencode_identical": 1.0,
+   "results_merged_into_cells": 0.0016826633406399616,
+   "patients_with_gap_over_48h": 0.06521739130434782
+  },
+  "res_360min": {
+   "steps": 28,
+   "compression": {
+    "n_samples": 92,
+    "raw_bits_per_sample": 3821.478260869565,
+    "token_bits_per_sample": 1181.183104742855,
+    "compression_ratio": 3.2352970894394106,
+    "tokens_per_sample_mean": 138.70652173913044,
+    "tokens_per_sample_median": 69.0,
+    "tokens_per_sample_max": 824,
+    "protocol_overhead_bits_per_sample": 154.0,
+    "compression_ratio_with_overhead": 2.862137969912037,
+    "discrete_tokens_per_sample": 138.70652173913044,
+    "continuous_vectors_per_sample": 0.0,
+    "raw_elements_per_sample": 67.09782608695652,
+    "sequence_reduction": 0.48373951884648536
+   },
+   "mae_z_observed_cells": 0.1373971551656723,
+   "observation_mask_preserved": 1.0,
+   "reencode_identical": 1.0,
+   "results_merged_into_cells": 0.02130201342689886,
+   "patients_with_gap_over_48h": 0.06521739130434782
+  },
+  "res_1440min": {
+   "steps": 7,
+   "compression": {
+    "n_samples": 92,
+    "raw_bits_per_sample": 3821.478260869565,
+    "token_bits_per_sample": 916.73359998223,
+    "compression_ratio": 4.168580993369983,
+    "tokens_per_sample_mean": 107.65217391304348,
+    "tokens_per_sample_median": 68.0,
+    "tokens_per_sample_max": 453,
+    "protocol_overhead_bits_per_sample": 154.0,
+    "compression_ratio_with_overhead": 3.569028057896929,
+    "discrete_tokens_per_sample": 107.65217391304348,
+    "continuous_vectors_per_sample": 0.0,
+    "raw_elements_per_sample": 67.09782608695652,
+    "sequence_reduction": 0.62328352180937
+   },
+   "mae_z_observed_cells": 0.1291014552116394,
+   "observation_mask_preserved": 1.0,
+   "reencode_identical": 1.0,
+   "results_merged_into_cells": 0.10319437937621048,
+   "patients_with_gap_over_48h": 0.05434782608695652
+  }
+ },
+ "image": {
+  "medmnist_zero_shot_28": {
+   "reconstruction": {
+    "mse": 214.9471510997037,
+    "mae": 10.662631463628395,
+    "psnr_db": 25.394432444749857,
+    "ssim": 0.9348299504239108
+   },
+   "compression": {
+    "n_samples": 163,
+    "raw_bits_per_sample": 6272.0,
+    "token_bits_per_sample": 560.0788588859973,
+    "compression_ratio": 11.198423044346065,
+    "tokens_per_sample_mean": 56.0,
+    "tokens_per_sample_median": 56.0,
+    "tokens_per_sample_max": 56,
+    "protocol_overhead_bits_per_sample": 154.0,
+    "compression_ratio_with_overhead": 8.783343634881824,
+    "discrete_tokens_per_sample": 56.0,
+    "continuous_vectors_per_sample": 0.0,
+    "raw_elements_per_sample": 784.0,
+    "sequence_reduction": 14.0
+   },
+   "utilization": {
+    "n_codes": 1024,
+    "total_assignments": 7987,
+    "active_codes": 498,
+    "utilization": 0.486328125,
+    "dead_codes": 526,
+    "dead_pct": 51.3671875,
+    "entropy_bits": 7.277309449773483,
+    "norm_entropy": 0.7277309449773484,
+    "perplexity": 155.12737089400855,
+    "top10_share": 0.7206710905220984
+   }
+  },
+  "mimic_trained_28": {
+   "reconstruction": {
+    "mse": 91.23391135595341,
+    "mae": 6.76571303367973,
+    "psnr_db": 29.181241493220277,
+    "ssim": 0.9657945743035711
+   },
+   "compression": {
+    "n_samples": 163,
+    "raw_bits_per_sample": 6272.0,
+    "token_bits_per_sample": 560.0788588859973,
+    "compression_ratio": 11.198423044346065,
+    "tokens_per_sample_mean": 56.0,
+    "tokens_per_sample_median": 56.0,
+    "tokens_per_sample_max": 56,
+    "protocol_overhead_bits_per_sample": 154.0,
+    "compression_ratio_with_overhead": 8.783343634881824,
+    "discrete_tokens_per_sample": 56.0,
+    "continuous_vectors_per_sample": 0.0,
+    "raw_elements_per_sample": 784.0,
+    "sequence_reduction": 14.0
+   },
+   "utilization": {
+    "n_codes": 1024,
+    "total_assignments": 7987,
+    "active_codes": 1018,
+    "utilization": 0.994140625,
+    "dead_codes": 6,
+    "dead_pct": 0.5859375,
+    "entropy_bits": 9.776930785510679,
+    "norm_entropy": 0.9776930785510679,
+    "perplexity": 877.3026313531072,
+    "top10_share": 0.2257418304745211
+   }
+  },
+  "mimic_trained_28_on_pneumoniamnist": {
+   "reconstruction": {
+    "mse": 75.9055740886098,
+    "mae": 6.495321766527123,
+    "psnr_db": 29.697015221686577,
+    "ssim": 0.9415161012717765
+   },
+   "utilization": {
+    "active_codes": 993,
+    "utilization": 0.9697265625,
+    "perplexity": 480.6863543333895
+   }
+  },
+  "mimic_trained_64": {
+   "reconstruction": {
+    "mse": 57.56387747236068,
+    "mae": 4.853681880272239,
+    "psnr_db": 31.60264034802102,
+    "ssim": 0.9493581904671826
+   },
+   "compression": {
+    "n_samples": 163,
+    "raw_bits_per_sample": 32768.0,
+    "token_bits_per_sample": 2720.3830288748436,
+    "compression_ratio": 12.04536260232182,
+    "tokens_per_sample_mean": 272.0,
+    "tokens_per_sample_median": 272.0,
+    "tokens_per_sample_max": 272,
+    "protocol_overhead_bits_per_sample": 170.0,
+    "compression_ratio_with_overhead": 11.336905757004736,
+    "discrete_tokens_per_sample": 272.0,
+    "continuous_vectors_per_sample": 0.0,
+    "raw_elements_per_sample": 4096.0,
+    "sequence_reduction": 15.058823529411764
+   },
+   "utilization": {
+    "n_codes": 1024,
+    "total_assignments": 41728,
+    "active_codes": 1024,
+    "utilization": 1.0,
+    "dead_codes": 0,
+    "dead_pct": 0.0,
+    "entropy_bits": 9.780969511215833,
+    "norm_entropy": 0.9780969511215833,
+    "perplexity": 879.7620206697177,
+    "top10_share": 0.23837710889570551
+   }
+  },
+  "n_test_images": 163
+ },
+ "ecg": {
+  "n_ecg": 848,
+  "n_test_ecg": 124,
+  "hz": 100,
+  "steps": 1000,
+  "tokens_per_ecg": 251,
+  "reconstruction": {
+   "rmse_mv": {
+    "mean": 0.22159349167298886,
+    "sd": 0.6864804649448596
+   },
+   "prdn_pct": {
+    "mean": 83.61251443432224,
+    "sd": 15.575172889348432
+   },
+   "lead_corr": {
+    "mean": 0.7280393870260201,
+    "sd": 0.099766176229666
+   }
+  },
+  "compression": {
+   "n_samples": 124,
+   "raw_bits_per_sample": 960000.0,
+   "token_bits_per_sample": 2510.70656891737,
+   "compression_ratio": 382.3624838859434,
+   "tokens_per_sample_mean": 251.0,
+   "tokens_per_sample_median": 251.0,
+   "tokens_per_sample_max": 251,
+   "protocol_overhead_bits_per_sample": 242.0,
+   "compression_ratio_with_overhead": 348.7476692357968,
+   "discrete_tokens_per_sample": 251.0,
+   "continuous_vectors_per_sample": 0.0,
+   "raw_elements_per_sample": 12000.0,
+   "sequence_reduction": 47.808764940239044,
+   "compression_ratio_vs_100hz_16bit": 76.47249677718867
+  },
+  "utilization": {
+   "n_codes": 1024,
+   "total_assignments": 24800,
+   "active_codes": 1016,
+   "utilization": 0.9921875,
+   "dead_codes": 8,
+   "dead_pct": 0.78125,
+   "entropy_bits": 9.437324592156497,
+   "norm_entropy": 0.9437324592156496,
+   "perplexity": 693.2945417633957,
+   "top10_share": 0.3426209677419355
+  }
+ },
+ "unified": {
+  "patients": 600,
+  "encode_seconds": 15.175702810287476,
+  "structural_validation_passed": 600,
+  "shard_roundtrip_identical": 1.0,
+  "segments_decoded": 3131,
+  "text_exact_after_shard": 1.0,
+  "labs_mask_exact_after_shard": 1.0,
+  "sequence_length": {
+   "mean": 1128.0733333333333,
+   "median": 1013.0,
+   "max": 4394,
+   "over_4096": 1,
+   "over_8192": 0
+  },
+  "tokens_by_source_mean": {
+   "mimic-cxr-jpg": 496.375,
+   "mimic-cxr:report": 124.15,
+   "mimic-iv-ecg": 358.9866666666667,
+   "mimic-iv:labevents": 142.34333333333333
+  },
+  "token_share_by_source": {
+   "mimic-cxr-jpg": 0.44002015235416136,
+   "mimic-cxr:report": 0.11005490186808187,
+   "mimic-iv-ecg": 0.3182299023113155,
+   "mimic-iv:labevents": 0.12618269497845885
+  },
+  "shard_bytes_per_patient": 2402.826666666667,
+  "routes": {
+   "mimic-iv:labevents": "TSEventCodec",
+   "mimic-iv-ecg": "TSVQCodec"
+  }
+ },
+ "downstream": {
+  "task": "death within 365 days of the radiograph",
+  "n": 600,
+  "positives": 90,
+  "prevalence": 0.15,
+  "protocol": "5x repeated stratified 5-fold CV, logistic regression (L2, C=0.1, balanced class weights) on standardised log1p token counts",
+  "demographics": {
+   "features": 2,
+   "auroc": {
+    "mean": 0.755119825708061,
+    "sd": 0.06995788413996323
+   },
+   "auprc": {
+    "mean": 0.37672571946621686,
+    "sd": 0.1085997916670433
+   }
+  },
+  "image": {
+   "features": 1024,
+   "auroc": {
+    "mean": 0.632962962962963,
+    "sd": 0.07331920111845838
+   },
+   "auprc": {
+    "mean": 0.28517947666259635,
+    "sd": 0.06939075462715083
+   }
+  },
+  "ecg": {
+   "features": 1024,
+   "auroc": {
+    "mean": 0.577995642701525,
+    "sd": 0.05582057978644995
+   },
+   "auprc": {
+    "mean": 0.20874875343365865,
+    "sd": 0.04402178354072639
+   }
+  },
+  "labs": {
+   "features": 585,
+   "auroc": {
+    "mean": 0.6940087145969498,
+    "sd": 0.0601480002900102
+   },
+   "auprc": {
+    "mean": 0.34620161334590477,
+    "sd": 0.07899950934305902
+   }
+  },
+  "text": {
+   "features": 2978,
+   "auroc": {
+    "mean": 0.6698692810457516,
+    "sd": 0.05256516166912644
+   },
+   "auprc": {
+    "mean": 0.2827821346641471,
+    "sd": 0.06610147535975791
+   }
+  },
+  "image+ecg+labs": {
+   "features": 2633,
+   "auroc": {
+    "mean": 0.7390196078431371,
+    "sd": 0.0542243813512352
+   },
+   "auprc": {
+    "mean": 0.3682024826991356,
+    "sd": 0.082128099296127
+   }
+  },
+  "all (image+ecg+labs+text)": {
+   "features": 5611,
+   "auroc": {
+    "mean": 0.777843137254902,
+    "sd": 0.047347343449496544
+   },
+   "auprc": {
+    "mean": 0.38338709907968643,
+    "sd": 0.09072096472533579
+   }
+  },
+  "all + demographics": {
+   "features": 5613,
+   "auroc": {
+    "mean": 0.7808496732026142,
+    "sd": 0.04708963981321057
+   },
+   "auprc": {
+    "mean": 0.38623202195193734,
+    "sd": 0.09084900264103432
+   }
+  }
+ }
+}

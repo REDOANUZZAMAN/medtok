@@ -31,6 +31,7 @@ The comparison measures compression ratio, reconstruction error, codebook utilis
 | [`docs/architecture.md`](docs/architecture.md) | components, design decisions, CLI |
 | [`docs/datasets.md`](docs/datasets.md) | datasets, licences, splits, data-handling rules |
 | [`docs/experiments.md`](docs/experiments.md) | experiment matrix, ablations, results discussion |
+| [`docs/mimic_validation.md`](docs/mimic_validation.md) | validation on linked MIMIC-IV data (CXR + report + ECG + labs); results in `reports/mimic/` |
 
 ## Quick start (CPU is enough)
 
@@ -115,7 +116,7 @@ experiments/     run directories (git-ignored: checkpoints, codebooks, token sha
 
 ## Data use
 
-Only open datasets are downloaded automatically. Controlled or request-only data (MIMIC, Cholec80, SCARED) are never downloaded, and no raw or patient-level derived data is committed (see `.gitignore` and `docs/datasets.md`). Cataract-101 is CC BY-NC 4.0 (research use only). Cite Schoeffmann et al., MMSys 2018.
+Only open datasets are downloaded automatically. Controlled or request-only data (MIMIC, Cholec80, SCARED) are never downloaded, and no raw or patient-level derived data is committed. The MIMIC-IV validation reads a local credentialed copy and commits aggregate tables only (see `.gitignore` and `docs/datasets.md`). Cataract-101 is CC BY-NC 4.0 (research use only). Cite Schoeffmann et al., MMSys 2018.
 
 ## Licence
 

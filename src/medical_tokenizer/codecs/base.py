@@ -52,6 +52,43 @@ class Codec(ABC):
         return bits
 
 
+class RoutedCodec(Codec):
+    """Several codecs for ONE modality, chosen by Segment.source (e.g. MIMIC-IV ECG waveforms and lab
+    events are both time-series). The route key is written into the span meta, so decode needs no
+    side information and the sequence stays self-describing."""
+
+    def __init__(self, routes: dict[str, Codec]):
+        mods = {c.modality for c in routes.values()}
+        if len(mods) != 1:
+            raise ValueError(f"routed codecs must share one modality, got {sorted(mods)}")
+        self.routes, self.modality = routes, mods.pop()
+        self.rep = "/".join(sorted({c.rep for c in routes.values()}))
+        self.reversibility = "exact" if all(c.reversibility == "exact" for c in routes.values()) else "lossy"
+
+    def _route(self, source: str) -> Codec:
+        if source not in self.routes:
+            raise KeyError(f"no {self.modality} codec routed for source {source!r}")
+        return self.routes[source]
+
+    def encode(self, seg: Segment) -> TokenSpan:
+        return self.encode_batch([seg])[0]
+
+    def encode_batch(self, segs: list[Segment]) -> list[TokenSpan]:
+        out: list[TokenSpan | None] = [None] * len(segs)
+        for src in dict.fromkeys(s.source for s in segs):
+            idx = [i for i, s in enumerate(segs) if s.source == src]
+            for i, span in zip(idx, self._route(src).encode_batch([segs[i] for i in idx])):
+                span.meta = {**span.meta, "source": src}
+                out[i] = span
+        return out
+
+    def decode(self, span: TokenSpan) -> Any:
+        return self._route(span.meta["source"]).decode(span)
+
+    def raw_bits(self, seg: Segment) -> float:
+        return self._route(seg.source).raw_bits(seg)
+
+
 class MultimodalCodec:
     """Sample-level encode/decode: one codec per modality, one TokenSequence per Sample."""
 

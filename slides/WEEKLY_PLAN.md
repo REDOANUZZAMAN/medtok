@@ -14,6 +14,7 @@ Images and physiological time-series are fully implemented; text is supported in
 | 4 | Oct 29 | Adaptation and integration | synthetic templated text (v2), Cataract-101 phase events, point-cloud interface; integration tests | `experiments/interfaces`, `experiments/video_*`, `tests/test_pipeline_integration.py` |
 | 5 | Nov 5 | Tasks and ablations | image classification (AUROC, macro-F1) and ICU mortality (AUROC, AUPRC) on fixed splits and budgets; codebook-size and time-granularity ablations | `experiments/ds_*`, `experiments/abl_*`, figures `downstream`, `ablation_codebook_size` |
 | 6 | Nov 12 | Reproducibility and delivery | compression, reconstruction, utilisation and task metrics summarised; code, specification, report, demo | `reports/RESULTS.md`, `docs/`, `scripts/run_all.sh`, notebook |
+| 7 | Oct 17 (added) | Validation on linked MIMIC-IV data (supervisor request) | protocol on real linked records, CXR / ECG / labs / real reports, 1-year mortality from tokens | `reports/mimic/`, `docs/mimic_validation.md` |
 
 Each deck follows the same outline: recap of last week → work done → results / figures → issues and decisions → next week plan + questions.
 

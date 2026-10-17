@@ -1,0 +1,39 @@
+# MIMIC-IV linked multimodal validation (supervisor, 2026-10-17: "use the MIMIC-IV multimodal data to test and
+# validate your method"). 600 patients, one CXR study each, with the ECGs and labs of the 7 days before it.
+# python scripts/mimic_validate.py --config configs/mimic_validation.yaml
+# Credentialed data: models, token shards and example figures stay in experiments/ (git-ignored);
+# only aggregate tables are written to reports/mimic/.
+name: mimic_validation
+seed: 0
+output_dir: experiments
+data:
+  root: data/raw/mimic_demo_5gb/mimic_demo_5gb
+  split_seed: 0
+  horizon_days: 365          # label: death within 1 year of the radiograph
+  lab_top_k: 40              # lab variables = 40 most frequent numeric tests on the training split
+image:
+  pretrained: experiments/image_vq/latest     # MedMNIST tokenizer (K=1024), applied zero-shot at 28 px
+  sizes: [28, 64]                             # MIMIC-trained tokenizers, same architecture and codebook size
+  unified_size: 64
+  model: {arch: conv, patch_size: 4, dim: 32, hidden: 96, n_res: 2}
+  quantizer: {type: vq, n_codes: 1024, update: ema, beta: 0.25, decay: 0.99, normalize: true,
+              restart_dead: true, restart_threshold: 1.0}
+  train: {optimizer: adamw, batch_size: 64, lr: 2.0e-3, weight_decay: 1.0e-4, epochs: 100, eval_every: 25}
+ecg:
+  hz: 100                    # 500 Hz -> 100 Hz by block averaging; 10 s -> 1000 steps x 12 leads
+  model: {window: 20, groups: 4, dim: 16, hidden: 256}   # 0.2 s windows -> 50 windows x (<PATCH> + 4 codes) + <STATIC> = 251 tokens
+  quantizer: {type: vq, n_codes: 1024, update: ema, beta: 0.25, decay: 0.99, normalize: true,
+              restart_dead: true, restart_threshold: 1.0}
+  train: {optimizer: adamw, batch_size: 32, lr: 2.0e-3, weight_decay: 1.0e-4, epochs: 100, eval_every: 25}
+labs:
+  n_value_bins: 16
+  resolutions_min: [60, 360, 1440]   # time-granularity comparison
+  unified_resolution_min: 360
+text:
+  pretrained: data/processed/assets/text_bpe.json   # BPE trained on the synthetic templated notes
+  vocab_sizes: [1024, 4096]                          # BPE retrained on MIMIC training-split reports
+  unified_vocab: 4096
+downstream:
+  folds: 5
+  repeats: 5
+  C: 0.1

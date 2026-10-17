@@ -127,6 +127,26 @@ def dt_token(minutes: float) -> int:
     return RANGES["dt"].to_global(dt_to_bucket(minutes))
 
 
+DT_EXACT_MAX_MIN = 48 * 60.0
+
+
+def dt_chain(minutes: float, unit: float) -> list[int]:
+    """<DT> tokens for a gap of whole `unit`s that decode back to the same number of units.
+
+    Buckets above 48 h are log-spaced (inexact), so a longer gap is written as a chain of
+    48 h-or-shorter pieces, each a whole number of units; decoders sum consecutive <DT> tokens.
+    Gaps up to 48 h give one token, the same as dt_token.
+    """
+    piece = math.floor(DT_EXACT_MAX_MIN / unit) * unit
+    if minutes <= DT_EXACT_MAX_MIN or piece <= 0:
+        return [dt_token(minutes)]
+    out = []
+    while minutes > DT_EXACT_MAX_MIN:
+        out.append(dt_token(piece))
+        minutes -= piece
+    return out + [dt_token(minutes)]
+
+
 def range_of(gid: int) -> str:
     for r in RANGES.values():
         if gid in r:

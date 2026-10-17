@@ -7,7 +7,8 @@ All three representations start with the same static block
 so that comparisons isolate the temporal part.
 
 TSEventCodec  measurement events on the regular grid, in time order:
-                [<DT:k>] <VAR:name> <VBIN:q> ...   (<DT> only when the grid step changes)
+                [<DT:k>] <VAR:name> <VBIN:q> ...   (<DT> only when the grid step changes; a gap
+                                                    over 48 h is a chain of exact <DT> tokens)
               mode="obs"     one event per observed (step, variable) cell
               mode="change"  only when a variable's bin differs from its last emitted
                              bin (run-length / piecewise-constant segmentation)
@@ -31,7 +32,7 @@ from ...codecs.base import Codec
 from ...data.physionet import STATIC_VARS, TS_VARS, Normalizer, Stay, to_grid
 from ...encoders.timeseries import TimeSeriesWindowAutoencoder
 from ...protocol.schema import Segment, TokenSpan
-from ...protocol.vocab import CONT, RANGES, SPECIAL, Lexicon, bucket_to_dt, dt_to_bucket
+from ...protocol.vocab import CONT, RANGES, SPECIAL, Lexicon, bucket_to_dt, dt_chain
 
 STATIC = SPECIAL["<STATIC>"]
 PATCH = SPECIAL["<PATCH>"]
@@ -161,9 +162,10 @@ class TSEventCodec(_TSBase):
                 continue
             th = seg.t_start + h * res
             if h != prev_h:
-                ids.append(RANGES["dt"].to_global(dt_to_bucket((h - prev_h) * res)))
-                t.append(th)
-                pos.append([h, -1, -1])
+                dts = dt_chain((h - prev_h) * res, res)      # > 48 h gaps: several exact <DT> tokens
+                ids += dts
+                t += [th] * len(dts)
+                pos += [[h, -1, -1]] * len(dts)
                 prev_h = h
             for j in vs:
                 ids += [int(self._var_ids[j]), self.lex.vbin_id(int(bins[h, j]))]

@@ -8,9 +8,9 @@ Any standard sub-word tokenizer can be plugged in with `from_pretrained`
 (a tokenizer.json file or a Hugging Face hub id when `transformers` is
 installed), as long as its vocabulary fits the 8192-id text range.
 
-NOTE: none of the project's open datasets contains free-text clinical notes
-(MIMIC notes are credentialed-access). The text used in experiments is rendered
-from structured fields by data/notes.py and is labelled as such.
+NOTE: none of the project's open datasets contains free-text clinical notes. The text in
+the main experiments is rendered from structured fields by data/notes.py and is labelled
+as such; real radiology reports are used only in the MIMIC-IV validation (mimic_validate.py).
 """
 from __future__ import annotations
 

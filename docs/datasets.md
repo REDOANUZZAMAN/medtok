@@ -6,6 +6,7 @@ All numbers in this file come from `data/processed/data_stats.json`, which `pyth
 
 - Only **open** datasets are downloaded automatically: MedMNIST v2 and PhysioNet 2012 set-a.
 - **Controlled or request-only** datasets (MIMIC-*, Cholec80, SCARED) are never downloaded by code. Their loaders only read a local copy that the user has obtained under the dataset's terms.
+- **MIMIC-IV** (credentialed, PhysioNet DUA) is processed only on the project machine. Models, token shards and example reconstructions stay in `experiments/` (git-ignored). Only aggregate tables (`reports/mimic/`) are committed: no images, signals, report text or per-patient rows.
 - Cataract-101 is openly downloadable but has a non-commercial licence. It is fetched manually (one `curl`, below) after reading the licence, and the code only reads the local zip.
 - `data/raw/`, `data/processed/` and `experiments/` (checkpoints, token shards containing patient-level derived data) are git-ignored. Only aggregated metrics, tables and figures (`reports/`) are committed.
 - No patient identifier is logged. Sample ids are the datasets' own anonymous record / video ids.
@@ -68,7 +69,7 @@ This is a change of **surgical domain and label set**: cataract surgery (ophthal
 
 ### Text — synthetic templated notes (interface modality)
 
-No open dataset in scope contains clinical free text; MIMIC notes are credentialed-access. `data/notes.py` renders short notes from structured fields. **All of this text is synthetic.**
+No open dataset in scope contains clinical free text. (Real radiology reports are used only in the separate MIMIC-IV validation below.) `data/notes.py` renders short notes from structured fields. **All of this text is synthetic.**
 
 - Every text segment carries the source tag `synthetic-template:<kind>@v<version>` (current version 2). The generation rules and the fields each kind reads (`TEMPLATE_RULES`) are written to `data/processed/data_stats.json` and to the interfaces run.
 - Coverage: several wording variants per sentence, units (cm, kg, bpm, mmHg, °C), missing values ("not recorded"), negation ("Not mechanically ventilated in the first hour", "GCS not assessed", "No vital signs recorded"), and times relative to admission ("at 00:12 after admission").
@@ -76,10 +77,19 @@ No open dataset in scope contains clinical free text; MIMIC notes are credential
 - No fake pairing: samples are built within one dataset. Records from different datasets are never concatenated and presented as patient-matched multimodal data.
 - Acceptance is limited to lossless round-trip, field preservation and protocol compatibility (see `docs/experiments.md`). **No conclusion about clinical language, image-text alignment or clinical generalisation is drawn from them.** A real alignment claim would need authorised, genuinely paired reports.
 
+### MIMIC-IV linked multimodal subset — validation on real hospital data
+
+Supervisor's demo copy (given 2026-10-17), placed at `data/raw/mimic_demo_5gb/mimic_demo_5gb/`, with the `p10-p12` and `p13-p15` archives unpacked into `cxr/files/` next to `p16-p19`. Loader: `data/mimic.py`. Used only by `python -m medical_tokenizer.mimic_validate` (see `docs/mimic_validation.md`).
+
+- 600 patients, one chest X-ray study each (MIMIC-CXR-JPG, all views), its free-text radiology report, the 12-lead ECGs (MIMIC-IV-ECG, 500 Hz, 10 s) and the lab results (MIMIC-IV `labevents`) of the 7 days up to the radiograph. Nothing after the radiograph is included. Join key: `subject_id`.
+- These are **genuinely linked** records of the same patient, unlike the within-dataset samples above.
+- Reference time t = 0 is the radiograph minus 7 days, so all segments have t ≥ 0. Label: death within 365 days of the radiograph (`patients.dod`).
+- Splits: patient-level 70/15/15, stratified by the label (seed 0), same rule as PhysioNet 2012.
+- Lab variables: the 40 most frequent numeric tests on the training split, named `lab:<label>` and appended to the lexicon after the PhysioNet and ECG-lead names, so existing ids do not change.
+
 ## Not used, interfaces only
 
 | Dataset | Access | Status |
 |---|---|---|
 | Cholec80 | CAMMA data request | loaders for the phase / tool annotation files; `AnnotatedPhaseEventCodec` and the lexicon already include Cholec80 phases and tool on/off events |
 | SCARED | grand-challenge account | `PointCloudTokenizer` + `depth_to_points` (depth map → point cloud); demonstrated on synthetic surfaces only |
-| MIMIC-CXR / MIMIC notes | PhysioNet credentialing + DUA | not used; `ClinicalTextTokenizer.from_pretrained` accepts any sub-word tokenizer for future use |
