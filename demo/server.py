@@ -290,6 +290,12 @@ def api_results(q):
     return {"markdown": open(p).read() if os.path.exists(p) else "(no report yet)"}
 
 
+def api_mimic_results(q):
+    """Aggregate MIMIC-IV validation tables only (reports/mimic/). No patient-level data is served."""
+    p = os.path.join(ROOT, "reports", "mimic", "MIMIC_RESULTS.md")
+    return {"markdown": open(p).read() if os.path.exists(p) else "(no MIMIC report yet)"}
+
+
 # ------------------------------------------------------------------ public JSON API (v1)
 def v1_index(q):
     return {"name": "MedTok API", "protocol_version": PROTOCOL_VERSION, "vocab_size": VOCAB_SIZE,
@@ -341,7 +347,8 @@ def v1_classify_image(body):
 
 
 GET = {"/api/v1": v1_index, "/api/info": api_info, "/api/image": api_image, "/api/icu": api_icu, "/api/text": api_text,
-       "/api/video": api_video, "/api/sequence": api_sequence, "/api/results": api_results}
+       "/api/video": api_video, "/api/sequence": api_sequence, "/api/results": api_results,
+       "/api/mimic_results": api_mimic_results}
 POST = {"/api/image_upload": api_image_upload, "/api/v1/tokenize/image": v1_tokenize_image,
         "/api/v1/tokenize/text": v1_tokenize_text, "/api/v1/classify/image": v1_classify_image}
 

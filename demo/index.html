@@ -187,6 +187,7 @@ const TABS = [
   ["text", "Clinical text", "Clinical text · synthetic notes", I('<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h6"/>'), "Modalities"],
   ["seq", "Shared sequence", "Unified token sequence · JSONL", I('<path d="M4 6h16M4 12h10M4 18h13"/>'), "Protocol"],
   ["results", "Results", "Evaluation results", I('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'), "Evaluation"],
+  ["mimic", "MIMIC-IV results", "Validation on real hospital data · MIMIC-IV", I('<path d="M3 21h18M5 21V8l7-5 7 5v13M10 21v-5h4v5M12 8v4M10 10h4"/>'), "Evaluation"],
   ["api", "Developer API", "Developer API · Python toolkit", I('<path d="M8 6l-6 6 6 6M16 6l6 6-6 6"/>'), "Developers"]];
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
@@ -486,6 +487,32 @@ async function results() {
   } catch (e) { fail(e); }
 }
 
+// ---------------------------------------------------------------- MIMIC-IV (aggregate numbers only)
+async function mimic() {
+  loading();
+  try {
+    const d = await api("/api/mimic_results");
+    $("#main").innerHTML = `
+    <div class="explain"><b>What am I looking at?</b> The tokenizer tested on <b>real hospital data</b>: 600 MIMIC-IV patients,
+      each with chest X-rays, the doctor's report, heart signals (ECG) and blood tests from the 7 days before the X-ray.
+      All of one patient's data is turned into <b>one token sequence</b>, saved, loaded and decoded again.</div>
+    <div class="card"><h3>In short</h3>
+      <ul style="margin:0;padding-left:20px">
+        <li><b>The shared protocol works on real patients:</b> all 600 sequences pass every check and come back exactly.</li>
+        <li><b>Real data found a bug:</b> time gaps longer than 48 hours were stored only roughly. Now long gaps are built from
+          several exact pieces, and every time comes back right.</li>
+        <li><b>X-rays:</b> the design works, but the codebook should be trained on similar images (zero-shot vs MIMIC-trained below).</li>
+        <li><b>ECG</b> works without code changes but loses detail (the weakest part); <b>labs</b> and <b>reports</b> come back exactly.</li>
+        <li><b>The tokens are informative:</b> all four data types together predict 1-year survival best. This is a test of the
+          tokens, not a medical prediction tool.</li>
+      </ul></div>
+    <div class="card" style="border-left:4px solid #c2410c"><b>Privacy:</b> MIMIC-IV is credentialed data. This page shows
+      <b>summary numbers only</b>: no X-rays, ECG traces, report text or patient identifiers. The data itself never leaves the
+      project server.</div>
+    <div class="card md" style="overflow:auto">${md(d.markdown)}</div>`;
+  } catch (e) { fail(e); }
+}
+
 // ---------------------------------------------------------------- developer API
 async function apiPage() {
   loading();
@@ -555,7 +582,7 @@ back  = codec.decode(seq)                                  # [("image", reconstr
 }
 
 // ---------------------------------------------------------------- nav
-const VIEWS = {start, image: () => image(), icu: () => icu(), video: () => video(), text: () => text(), seq: () => seq(), results, api: apiPage};
+const VIEWS = {start, image: () => image(), icu: () => icu(), video: () => video(), text: () => text(), seq: () => seq(), results, mimic, api: apiPage};
 function show(tab) {
   if (!VIEWS[tab]) tab = "start";
   const t = TABS.find(x => x[0] === tab);
